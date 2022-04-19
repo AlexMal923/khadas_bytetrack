@@ -8,6 +8,9 @@ import numpy as np
 libc = ctypes.cdll.LoadLibrary("./yolov5_lib.so")
 from multiprocessing import Process
 
+libc.set_image_wrapper.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_void_p, ctypes.c_int, ctypes.c_int]
+libc.postpress_graph_image_wrapper.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p,
+                                                ctypes.c_int , ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
 class YOLOV5(threading.Thread):
     def __init__(self, model):
         threading.Thread.__init__(self)
@@ -33,10 +36,7 @@ class YOLOV5(threading.Thread):
         self.output_node_num = libc.get_graph_output_node_number(self.graph)
         print("Initialised!")
         start = time.time()
-        libc.set_image_wrapper.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_void_p, ctypes.c_int, ctypes.c_int]
-        libc.postpress_graph_image_wrapper.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p,
-                                                        ctypes.c_int , ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]
-        print("Set function for: ", time.time() - start)
+
         self.frame = None
         self.dets = np.zeros([30,6], dtype = np.float32)
         self.init = True
@@ -45,15 +45,8 @@ class YOLOV5(threading.Thread):
     def inference(self):
         start = time.time()
         self.ret, self.frame = self.cap.read()
-        # if not self.ret:
-        #     return
         print("Ret: ", self.ret)
-        # self.frame = cv2.resize(self.frame, (352,264))
-        # print("7")
-        self.frame = self.frame[:,:, ::-1]
-        # # height, width, _ = self.frame.shape
-        # print(self.frame.ctypes.data, 288, 352, self.input_tensor, self.imsize, self.imsize)
-        
+        self.frame = self.frame[:,:, ::-1]        
         libc.set_image_wrapper(self.frame.ctypes.data, 288, 352, self.input_tensor, self.imsize, self.imsize)
         print("Set images for  ", time.time() - start)
         start = time.time()
@@ -79,11 +72,9 @@ class YOLOV5(threading.Thread):
         while True:
             if self.init:
                 start = time.time()
-                # time.sleep(1)
                 self.inference()
                 self.post()
                 print("Fps:", 1/(time.time() - start))
-        # self.post()
 
     def __del__(self):
         self.cap.release()
@@ -93,56 +84,9 @@ class YOLOV5(threading.Thread):
         libc.release_tengine()
         print("Released everything and deleted yolov5")
 
-class InferThread(threading.Thread):
-    def __init__(self, yolov5):
-        threading.Thread.__init__(self)
-        self.yolov5 = yolov5
-
-    def run(self):
-        print("Running!")
-        print(yolov5.dets)
-        yolov5.inference()
-        yolov5.post()
-
-class PostThread(threading.Thread):
-    def __init__(self, yolov5):
-        threading.Thread.__init__(self)
-        self.yolov5 = yolov5
-
-    def run(self):
-       
-        self.yolov5.post()
-    
-
-# def inf():
-#     while True:
-#         # print("inf")
-#         yolov5.inference()
-
-# def post():
-#     while True:
-#         # print("post")
-#         yolov5.post()
-
-# def runInParallel(*fns):
-#     proc = []
-#     for fn in fns:
-#         p = mp.Process(target=fn)
-#         p.start()
-#         proc.append(p)
-#     for p in proc:
-#         p.join()
 
 
 if __name__ == "__main__":
-    # global yolov5
-    # libc.release_tengine()
-    
-    
-    # inf = InferThread(yolov5)
-    # 
-    # # time.sleep(15)
-    #
     try:
         yolov5 = YOLOV5("yolov5m_leaky_352_0mean_uint8.tmfile")
         yolov5.start()  
@@ -151,30 +95,4 @@ if __name__ == "__main__":
             pass
     except KeyboardInterrupt:
         del yolov5
-
-    # all_processes =[yolov5.inference, yolov5.post]
-    # 
-    # try:
-    #     yolov5 = YOLOV5("yolov5m_leaky_352_0mean_uint8.tmfile")
-    #     while True:
-    #         yolov5.inference()
-    #         yolov5.post()
-    # except KeyboardInterrupt:
-    #     del yolov5
-    # try:
-    #     infer = threading.Thread(target = yolov5.inference, daemon = True)
-    #     infer.start()
-    #     while True:
-    #         infer.join()
-    # except:
-    #     del yolov5
-    # while True:
-    #     start = time.time()
-    #     yolov5.inference()
-    #     yolov5.post()
-    #     # cv2.imshow('frame', yolov5.frame)
-    #     # key = cv2.waitKey(1)
-    #     # if (key == 27):
-    #     #     break
-    #     print("Fps: ", 1/(time.time()-start))
 

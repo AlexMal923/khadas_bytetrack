@@ -53,7 +53,6 @@ int num_thread = DEFAULT_THREAD_COUNT;
 void get_input_data_cv(const cv::Mat& sample, uint8_t* input_data, int img_h, int img_w, float input_scale, int zero_point, int swapRB = 0)
 {
 	cv::Mat img;
-    cout << "5" << endl;
 	if (sample.channels() == 4)
 	{
 		cv::cvtColor(sample, img, cv::COLOR_BGRA2BGR);
@@ -71,22 +70,17 @@ void get_input_data_cv(const cv::Mat& sample, uint8_t* input_data, int img_h, in
 	{
 		img = sample;
 	}
-    cout << "6" << endl;
 	cv::Mat img2(img_h,img_w,CV_8UC3,cv::Scalar(0,0,0));
 	int h,w;
-    cout << "6.5" << endl;
 	if((float)img.cols/(float)img_w > (float)img.rows/(float)img_h){
 		h=1.0*img_w/img.cols*img.rows;
 		w=img_w;
-        cout << "before resize 1" << " " << w << " " << h << endl;
 		cv::resize(img, img, cv::Size(w,h));
 	}else{
 		w=1.0*img_h/img.rows*img.cols;
 		h=img_h;
-        cout << "before resize 2" << endl;
 		cv::resize(img, img, cv::Size(w,h));
 	}
-    cout << "7" << endl;
 	int top = (img_h - h)/2;
 	int bat = (img_h - h + 1)/2;
 	int left = (img_w - w)/2;
@@ -94,7 +88,6 @@ void get_input_data_cv(const cv::Mat& sample, uint8_t* input_data, int img_h, in
 
 
 	cv::copyMakeBorder(img,img2,top,bat,left,right,cv::BORDER_CONSTANT,cv::Scalar(0,0,0));
-    cout << "8" << endl;
 	uint8_t* img_data = img2.data;
 	int hw = img_h * img_w;
 
@@ -1186,24 +1179,18 @@ int set_image_wrapper(void* data_pointer, int height, int width, tensor_t input_
     vector<uint8_t> input_data(img_size);
 	// cv::Mat frame = cv::imread(image_file,cv::IMREAD_COLOR);
     cv::Mat frame = cv::Mat(height, width, CV_8UC3, (uchar*)data_pointer);
-    cout << "0" << endl;
 	if (frame.empty())
 	{
 		fprintf(stderr, "Empty buffer\n");
 		return -1;
 	}
-    cout << "1" << endl;
     get_tensor_quant_param(input_tensor, &input_scale, &input_zero_point, 1);
-    cout << "2" << endl;
-    // cout << "input data:" << input_scale << input_zero_point << endl; 
     if (set_tensor_buffer(input_tensor, input_data.data(), img_size) < 0)
     {
         fprintf(stderr, "Set input tensor buffer failed\n");
         return -1;
     }
-    cout << "3" << endl;
 	get_input_data_cv(frame,input_data.data(),net_w,net_h,input_scale, input_zero_point, 0);
-    cout << "4" << endl;
     return 0;
 }
 
@@ -1220,7 +1207,6 @@ int set_image(const char* image_file, tensor_t input_tensor, int net_h, int net_
 	}
 
     get_tensor_quant_param(input_tensor, &input_scale, &input_zero_point, 1);
-    // cout << "input data:" << input_scale << input_zero_point << endl; 
     if (set_tensor_buffer(input_tensor, input_data.data(), img_size) < 0)
     {
         fprintf(stderr, "Set input tensor buffer failed\n");
@@ -1319,8 +1305,7 @@ int inference(const char* image_file, const char* model_file,
 		return -1;
 	}
 
-    get_tensor_quant_param(input_tensor, &input_scale, &input_zero_point, 1);
-    // cout << "input data:" << input_scale << input_zero_point << endl; 
+    get_tensor_quant_param(input_tensor, &input_scale, &input_zero_point, 1); 
     if (set_tensor_buffer(input_tensor, input_data.data(), img_size) < 0)
     {
         fprintf(stderr, "Set input tensor buffer failed\n");
