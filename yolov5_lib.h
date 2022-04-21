@@ -1,4 +1,3 @@
-
 #include <iostream>
 #include <cstdlib>
 #include <iomanip>
@@ -54,7 +53,7 @@ typedef struct layer
     int inputs;
     int outputs;
     int* mask;
-    float* biases;
+    float* anchors;
     float* output;
     int coords;
 } layer;
