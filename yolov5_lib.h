@@ -44,7 +44,6 @@ typedef struct
 
 typedef struct layer
 {
-    int layer_type;
     int batch;
     int total;
     int n, c, h, w;
@@ -58,13 +57,10 @@ typedef struct layer
     int coords;
 } layer;
 
-void postpress_graph_image_wrapper(void* data_pointer, int height, int width, float* array, graph_t graph, int output_node_num,int net_w, int net_h,int numBBoxes,int total_numAnchors,int layer_type);
-
-void postpress_graph_image(const cv::Mat& sample, graph_t graph, int output_node_num,int net_w, int net_h,int numBBoxes,int total_numAnchors,int layer_type);
-
+void postpress_graph_image_wrapper(void* data_pointer, int height, int width, float* array,
+									 graph_t graph, int output_node_num,int net_w, int net_h, int draw);
+									 
 int set_graph(int net_h, int net_w, graph_t graph);
-
-int set_image(const char* image_file, tensor_t input_tensor, int net_h, int net_w);
 
 int set_image_wrapper(void* data_pointer, int height, int width, tensor_t input_tensor, int net_h, int net_w);
 }
