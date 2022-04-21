@@ -67,6 +67,4 @@ int set_graph(int net_h, int net_w, graph_t graph);
 int set_image(const char* image_file, tensor_t input_tensor, int net_h, int net_w);
 
 int set_image_wrapper(void* data_pointer, int height, int width, tensor_t input_tensor, int net_h, int net_w);
-
-int inference(const char* image_file, const char* model_file, context_t timvx_context, int rtt);
 }
