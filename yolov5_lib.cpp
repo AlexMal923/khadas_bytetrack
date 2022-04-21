@@ -327,18 +327,18 @@ int get_yolo_detections(layer l, int w, int h, int netw, int neth, float thresh,
 
 
 void fill_network_boxes(vector<layer> layers_params, int img_w, int img_h, int net_w, int net_h, float thresh,
-                        float hier, int* map, int relative, detection* dets)
+						float hier, int* map, int relative, detection* dets)
 {
-    int j;
-    for (j = 0; j < ( int )layers_params.size(); ++j)
-    {
-        layer l = layers_params[j];
-        if (0 == l.layer_type)
-        {
-            int count = get_yolo_detections(l, img_w, img_h, net_w, net_h, thresh, map, relative, dets);
-            dets += count;
-        }
-    }
+	int j;
+	for (j = 0; j < ( int )layers_params.size(); ++j)
+	{
+		layer l = layers_params[j];
+		if (0 == l.layer_type)
+		{
+			int count = get_yolo_detections(l, img_w, img_h, net_w, net_h, thresh, map, relative, dets);
+			dets += count;
+		}
+	}
 }
 
 detection* get_network_boxes(vector<layer> layers_params, int img_w, int img_h, int net_w, int net_h, float thresh,
@@ -460,22 +460,22 @@ static cv::Scalar obj_id_to_color(int obj_id) {
 }
 
 int set_graph(int net_h, int net_w, graph_t graph){
-    int img_size = net_h * net_w * 3;
-    int dims[] = {1, 3, net_h, net_w};    // nchw
+	int img_size = net_h * net_w * 3;
+	int dims[] = {1, 3, net_h, net_w};    // nchw
  
-    vector<uint8_t> input_data(img_size);
+	vector<uint8_t> input_data(img_size);
 
-    tensor_t input_tensor = get_graph_input_tensor(graph, 0, 0);
-    if (input_tensor == nullptr)
-    {
-        fprintf(stderr, "Get input tensor failed\n");
-        return -1;
-    }
+	tensor_t input_tensor = get_graph_input_tensor(graph, 0, 0);
+	if (input_tensor == nullptr)
+	{
+		fprintf(stderr, "Get input tensor failed\n");
+		return -1;
+	}
 
-    if (set_tensor_shape(input_tensor, dims, 4) < 0)
-    {
-        fprintf(stderr, "Set input tensor shape failed\n");
-        return -1;
+	if (set_tensor_shape(input_tensor, dims, 4) < 0)
+	{
+		fprintf(stderr, "Set input tensor shape failed\n");
+		return -1;
     }
 
     if (prerun_graph(graph) < 0)
@@ -592,6 +592,16 @@ void postpress_graph_image_wrapper(void* data_pointer, int height, int width, fl
 		if (dets[i].prob)
 			free(dets[i].prob);
 	}
+	// set old detections to zero
+	while (counter < 30){
+		array[counter*6 + 0] = 0;
+		array[counter*6 + 1] = 0;
+		array[counter*6 + 2] = 0;
+		array[counter*6 + 3] = 0;
+		array[counter*6 + 4] = 0;
+		array[counter*6 + 5] = 0;
+		counter++;
+	}
 	array[counter*6 + 5] = 0;
 	free(dets);
 
@@ -612,19 +622,18 @@ int set_image_wrapper(void* data_pointer, int height, int width, tensor_t input_
 	int input_zero_point = 0;
 	int img_size = net_h * net_w * 3;
 	vector<uint8_t> input_data(img_size);
-	// cv::Mat frame = cv::imread(image_file,cv::IMREAD_COLOR);
 	cv::Mat frame = cv::Mat(height, width, CV_8UC3, (uchar*)data_pointer);
 	if (frame.empty())
 	{
 		fprintf(stderr, "Empty buffer\n");
 		return -1;
 	}
-    get_tensor_quant_param(input_tensor, &input_scale, &input_zero_point, 1);
-    if (set_tensor_buffer(input_tensor, input_data.data(), img_size) < 0)
-    {
-        fprintf(stderr, "Set input tensor buffer failed\n");
-        return -1;
-    }
+	get_tensor_quant_param(input_tensor, &input_scale, &input_zero_point, 1);
+	if (set_tensor_buffer(input_tensor, input_data.data(), img_size) < 0)
+	{
+		fprintf(stderr, "Set input tensor buffer failed\n");
+		return -1;
+	}
 	get_input_data_cv(frame,input_data.data(),net_w,net_h,input_scale, input_zero_point, 0);
-    return 0;
+	return 0;
 }
