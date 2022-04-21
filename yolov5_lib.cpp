@@ -125,13 +125,9 @@ layer make_darknet_layer(int batch, int w, int h, int net_w, int net_h, int n, i
     l.classes = classes;
     l.inputs = l.w * l.h * l.c;
     // yolov5
-    float biases[18] = {10, 13, 16, 30, 33, 23, 30, 61, 62, 45, 59, 119, 116, 90, 156, 198, 373, 326};
-    // tiny
-    float biases_tiny[12] = {10, 14, 23, 27, 37, 58, 81, 82, 135, 169, 344, 319};
-    // yolov2
-    float biases_yolov2[10] = {0.57273, 0.677385, 1.87446, 2.06253, 3.33843, 5.47434, 7.88282, 3.52778, 9.77052, 9.16828};
+    float anchors[18] = {10, 13, 16, 30, 33, 23, 30, 61, 62, 45, 59, 119, 116, 90, 156, 198, 373, 326};
 
-    l.biases = ( float* )calloc(total * 2, sizeof(float));
+    l.anchors = ( float* )calloc(total * 2, sizeof(float));
     if (layer_type == 0)
     {
         l.mask = ( int* )calloc(n, sizeof(int));
@@ -139,7 +135,7 @@ layer make_darknet_layer(int batch, int w, int h, int net_w, int net_h, int n, i
         {
             for (int i = 0; i < total * 2; ++i)
             {
-                l.biases[i] = biases[i];
+                l.anchors[i] = anchors[i];
             }
             if (l.w == net_w / 32)
             {
@@ -160,34 +156,8 @@ layer make_darknet_layer(int batch, int w, int h, int net_w, int net_h, int n, i
                     l.mask[i] = j++;
             }
         }
-        if (6 == total)
-        {
-            for (int i = 0; i < total * 2; ++i)
-            {
-                l.biases[i] = biases_tiny[i];
-            }
-            if (l.w == net_w / 32)
-            {
-                int j = 3;
-                for (int i = 0; i < l.n; ++i)
-                    l.mask[i] = j++;
-            }
-            if (l.w == net_w / 16)
-            {
-                int j = 0;
-                for (int i = 0; i < l.n; ++i)
-                    l.mask[i] = j++;
-            }
-        }
     }
-    else if (1 == layer_type)
-    {
-        l.coords = 4;
-        for (int i = 0; i < total * 2; ++i)
-        {
-            l.biases[i] = biases_yolov2[i];
-        }
-    }
+
     l.layer_type = layer_type;
     l.outputs = l.inputs;
     l.output = ( float* )calloc(batch * l.outputs, sizeof(float));
@@ -195,38 +165,30 @@ layer make_darknet_layer(int batch, int w, int h, int net_w, int net_h, int n, i
     return l;
 }
 
-void free_darknet_layer(layer l)
-{
-    if (NULL != l.biases)
-    {
-        free(l.biases);
-        l.biases = NULL;
-    }
-    if (NULL != l.mask)
-    {
-        free(l.mask);
-        l.mask = NULL;
-    }
-    if (NULL != l.output)
-    {
-        free(l.output);
-        l.output = NULL;
-    }
-}
+// void free_darknet_layer(layer l)
+// {
+//     if (NULL != l.anchors)
+//     {
+//         free(l.anchors);
+//         l.anchors = NULL;
+//     }
+//     if (NULL != l.mask)
+//     {
+//         free(l.mask);
+//         l.mask = NULL;
+//     }
+//     if (NULL != l.output)
+//     {
+//         free(l.output);
+//         l.output = NULL;
+//     }
+// }
 
 static int entry_index(layer l, int batch, int location, int entry)
 {
     int n = location / (l.w * l.h);
     int loc = location % (l.w * l.h);
     return batch * l.outputs + n * l.w * l.h * (4 + l.classes + 1) + entry * l.w * l.h + loc;
-}
-
-void logistic_cpu(float* input, int size)
-{
-    for (int i = 0; i < size; ++i)
-    {
-        input[i] = 1.f / (1.f + expf(-input[i]));
-    }
 }
 
 int yolo_num_detections(layer l, float thresh)
@@ -260,9 +222,7 @@ int num_detections(vector<layer> layers_params, float thresh)
         else if (1 == l.layer_type)
             s += l.w * l.h * l.n;
     }
-#if DEBUG_OPTION
-    fprintf(stderr, "%s,%d\n", __func__, s);
-#endif
+
     return s;
 }
 
@@ -315,14 +275,14 @@ void correct_yolo_boxes(detection* dets, int n, int w, int h, int netw, int neth
     }
 }
 
-box get_yolo_box(float* x, float* biases, int n, int index, int i, int j, int lw, int lh, int w, int h, int stride)
+box get_yolo_box(float* x, float* anchors, int n, int index, int i, int j, int lw, int lh, int w, int h, int stride)
 {
     box b;
 
     b.x = (i + (x[index + 0 * stride]) * 2 - 0.5) / lw;
     b.y = (j + (x[index + 1 * stride]) * 2 - 0.5) / lh;
-    b.w = (4 * pow(x[index + 2 * stride], 2) * biases[2 * n]) / w;
-    b.h = (4 * pow(x[index + 3 * stride], 2) * biases[2 * n + 1]) / h;
+    b.w = (4 * pow(x[index + 2 * stride], 2) * anchors[2 * n]) / w;
+    b.h = (4 * pow(x[index + 3 * stride], 2) * anchors[2 * n + 1]) / h;
 
     return b;
 }
@@ -347,7 +307,7 @@ int get_yolo_detections(layer l, int w, int h, int netw, int neth, float thresh,
                     continue;
                 int box_index = entry_index(l, b, n * l.w * l.h + i, 0);
 
-                dets[count].bbox = get_yolo_box(predictions, l.biases, l.mask[n], box_index, col, row, l.w, l.h, netw,
+                dets[count].bbox = get_yolo_box(predictions, l.anchors, l.mask[n], box_index, col, row, l.w, l.h, netw,
                                                 neth, l.w * l.h);
                 dets[count].objectness = objectness;
                 dets[count].classes = l.classes;
@@ -365,93 +325,6 @@ int get_yolo_detections(layer l, int w, int h, int netw, int neth, float thresh,
     return count;
 }
 
-void correct_region_boxes(detection* dets, int n, int w, int h, int netw, int neth, int relative)
-{
-    int i;
-    int new_w = 0;
-    int new_h = 0;
-    if ((( float )netw / w) < (( float )neth / h))
-    {
-        new_w = netw;
-        new_h = (h * netw) / w;
-    }
-    else
-    {
-        new_h = neth;
-        new_w = (w * neth) / h;
-    }
-    for (i = 0; i < n; ++i)
-    {
-        box b = dets[i].bbox;
-        b.x = (b.x - (netw - new_w) / 2. / netw) / (( float )new_w / netw);
-        b.y = (b.y - (neth - new_h) / 2. / neth) / (( float )new_h / neth);
-        b.w *= ( float )netw / new_w;
-        b.h *= ( float )neth / new_h;
-        if (!relative)
-        {
-            b.x *= w;
-            b.w *= w;
-            b.y *= h;
-            b.h *= h;
-        }
-        dets[i].bbox = b;
-    }
-}
-
-box get_region_box(float* x, float* biases, int n, int index, int i, int j, int w, int h, int stride)
-{
-    box b;
-    b.x = (i + x[index + 0 * stride]) / w;
-    b.y = (j + x[index + 1 * stride]) / h;
-    b.w = exp(x[index + 2 * stride]) * biases[2 * n] / w;
-    b.h = exp(x[index + 3 * stride]) * biases[2 * n + 1] / h;
-    return b;
-}
-
-void get_region_detections(layer l, int w, int h, int netw, int neth, float thresh, int* map, float tree_thresh,
-                           int relative, detection* dets)
-{
-    int i, j, n;
-    float* predictions = l.output;
-
-    for (i = 0; i < l.w * l.h; ++i)
-    {
-        int row = i / l.w;
-        int col = i % l.w;
-        for (n = 0; n < l.n; ++n)
-        {
-            int index = n * l.w * l.h + i;
-            for (j = 0; j < l.classes; ++j)
-            {
-                dets[index].prob[j] = 0;
-            }
-            int obj_index = entry_index(l, 0, n * l.w * l.h + i, l.coords);
-            int box_index = entry_index(l, 0, n * l.w * l.h + i, 0);
-            int mask_index = entry_index(l, 0, n * l.w * l.h + i, 4);
-            float scale = predictions[obj_index];
-            dets[index].bbox = get_region_box(predictions, l.biases, n, box_index, col, row, l.w, l.h, l.w * l.h);
-            dets[index].objectness = scale > thresh ? scale : 0;
-            if (dets[index].mask)
-            {
-                for (j = 0; j < l.coords - 4; ++j)
-                {
-                    dets[index].mask[j] = l.output[mask_index + j * l.w * l.h];
-                }
-            }
-            // int class_index = entry_index(l, 0, n*l.w*l.h + i, l.coords + 1);
-            if (dets[index].objectness)
-            {
-                for (j = 0; j < l.classes; ++j)
-                {
-                    int class_index = entry_index(l, 0, n * l.w * l.h + i, l.coords + 1 + j);
-                    float prob = scale * predictions[class_index];
-                    dets[index].prob[j] = (prob > thresh) ? prob : 0;
-                }
-            }
-        }
-    }
-    correct_region_boxes(dets, l.w * l.h * l.n, w, h, netw, neth, relative);
-}
 
 void fill_network_boxes(vector<layer> layers_params, int img_w, int img_h, int net_w, int net_h, float thresh,
                         float hier, int* map, int relative, detection* dets)
@@ -464,11 +337,6 @@ void fill_network_boxes(vector<layer> layers_params, int img_w, int img_h, int n
         {
             int count = get_yolo_detections(l, img_w, img_h, net_w, net_h, thresh, map, relative, dets);
             dets += count;
-        }
-        else
-        {
-            get_region_detections(l, img_w, img_h, net_w, net_h, thresh, map, hier, relative, dets);
-            dets += l.w * l.h * l.n;
         }
     }
 }
@@ -494,26 +362,6 @@ void free_detections(detection* dets, int nboxes)
     }
     free(dets);
 }
-
-// int nms_comparator(const void* pa, const void* pb)
-// {
-//     detection a = *( detection* )pa;
-//     detection b = *( detection* )pb;
-//     float diff = 0;
-//     if (b.sort_class >= 0)
-//     {
-//         diff = a.prob[b.sort_class] - b.prob[b.sort_class];
-//     }
-//     else
-//     {
-//         diff = a.objectness - b.objectness;
-//     }
-//     if (diff < 0)
-//         return 1;
-//     else if (diff > 0)
-//         return -1;
-//     return 0;
-// }
 
 float overlap(float x1, float w1, float x2, float w2)
 {
@@ -589,12 +437,6 @@ void do_nms_sort(detection* dets, int total, int classes, float thresh)
     }
 }
 
-
-void show_usage()
-{
-    fprintf(stderr, "[Usage]:  [-h]\n    [-m model_file] [-d video_device] [-r repeat_count] [-t thread_count]\n");
-}
-
 int check_file_exist(const char* file_name)
 {
     FILE* fp = fopen(file_name, "r");
@@ -617,147 +459,47 @@ static cv::Scalar obj_id_to_color(int obj_id) {
 	return color;
 }
 
+int set_graph(int net_h, int net_w, graph_t graph){
+    int img_size = net_h * net_w * 3;
+    int dims[] = {1, 3, net_h, net_w};    // nchw
+ 
+    vector<uint8_t> input_data(img_size);
 
+    tensor_t input_tensor = get_graph_input_tensor(graph, 0, 0);
+    if (input_tensor == nullptr)
+    {
+        fprintf(stderr, "Get input tensor failed\n");
+        return -1;
+    }
 
-void postpress_graph(cv::Mat& frame, graph_t graph, int output_node_num,int net_w, int net_h,int numBBoxes,int total_numAnchors,int layer_type,char *window_name)
-{
-//	cv::Mat frame = sample;
+    if (set_tensor_shape(input_tensor, dims, 4) < 0)
+    {
+        fprintf(stderr, "Set input tensor shape failed\n");
+        return -1;
+    }
 
-	vector<layer> layers_params;
-    //coco datasheet
-    const char *coco_names[80] = {"person","bicycle","car","motorbike","aeroplane","bus",
-                                "train","truck","boat","traffic light","fire hydrant","stop sign",
-                                "parking meter","bench","bird","cat","dog","horse","sheep","cow",
-                                "elephant","bear","zebra","giraffe","backpack","umbrella","handbag",
-                                "tie","suitcase","frisbee","skis","snowboard","sports ball","kite",
-                                "baseball bat","baseball glove","skateboard","surfboard","tennis racket",
-                                "bottle","wine glass","cup","fork","knife","spoon","bowl","banana","apple",
-                                "sandwich","orange","broccoli","carrot","hot dog","pizza","donut","cake",
-                                "chair","sofa","pottedplant","bed","diningtable","toilet","tvmonitor",
-                                "laptop","mouse","remote","keyboard","cell phone","microwave","oven",
-                                "toaster","sink","refrigerator","book","clock","vase","scissors","teddy bear","hair drier","toothbrush"};
-	layers_params.clear();
-
-	for (int i = 0; i < output_node_num; ++i)
-	{
-		tensor_t out_tensor = get_graph_output_tensor(graph, i, 0);    //"detection_out"
-		int out_dim[4];
-		get_tensor_shape(out_tensor, out_dim, 4);
-		layer l_params;
-		int out_w = out_dim[3];
-		int out_h = out_dim[2];
-		l_params = make_darknet_layer(1, out_w, out_h, net_w, net_h, numBBoxes, total_numAnchors, classes, layer_type);
-		layers_params.push_back(l_params);
-
-		/* dequant output data */
-		float output_scale = 0.f;
-		int output_zero_point = 0;
-		get_tensor_quant_param(out_tensor, &output_scale, &output_zero_point, 1);
-		int count = get_tensor_buffer_size(out_tensor) / sizeof(uint8_t);
-		uint8_t* data_uint8 = ( uint8_t* )get_tensor_buffer(out_tensor);
-		float* data_fp32 = ( float* )malloc(sizeof(float) * count);
-		for (int c = 0; c < count; c++)
-		{
-			data_fp32[c] = (( float )data_uint8[c] - ( float )output_zero_point) * output_scale;
-		}
-        /* copy data to darknet layer*/
-        memcpy(( void* )l_params.output, ( void* )data_fp32, sizeof(float) * l_params.inputs * l_params.batch);
-
-		free(data_fp32);
-	}
-
-	int nboxes = 0;
-	// get network boxes
-	detection* dets =
-		get_network_boxes(layers_params, frame.cols, frame.rows, net_w, net_h, thresh, hier_thresh, 0, relative, &nboxes);
-
-	if (nms != 0)
-	{
-		do_nms_sort(dets, nboxes, classes, nms);
-	}
-
-	int i, j;
-	for (i = 0; i < nboxes; ++i)
-	{
-		int cls = -1;
-		char cvTest[64];
-		for (j = 0; j < classes; ++j)
-		{
-			if (dets[i].prob[j] > 0.5)
-			{
-				if (cls < 0)
-				{
-					cls = j;
-				}
-#if DEBUG_OPTION
-				fprintf(stderr, "%d: %.0f%%\n", cls, dets[i].prob[j] * 100);
-#endif
-				sprintf(cvTest,"%s",coco_names[cls]);
-			}
-
-		}
-		if (cls >= 0)
-		{
-			box b = dets[i].bbox;
-			int left = (b.x - b.w / 2.) * frame.cols;
-			int top = (b.y - b.h / 2.) * frame.rows;
-			if (top < 30) {
-				top = 30;
-				left +=10;
-			}
-
-#if DEBUG_OPTION
-			fprintf(stderr, "left = %d,top = %d\n", left, top);
-#endif
-			cv::Rect rect(left, top, b.w*frame.cols, b.h*frame.rows);
-
-			int baseline;
-			cv::Size text_size = cv::getTextSize(cvTest, cv::FONT_HERSHEY_COMPLEX,0.5,1,&baseline);
-
-			cv::Rect rect1(left, top-20, text_size.width+10, 20);
-			cv::rectangle(frame,rect,obj_id_to_color(cls),1,8,0);
-			cv::rectangle(frame,rect1,obj_id_to_color(cls),-1);
-			cv::putText(frame,cvTest,cvPoint(left+5,top-5),cv::FONT_HERSHEY_COMPLEX,0.5,cv::Scalar(0,0,0),1);
-		}
-
-
-		if (dets[i].mask)
-			free(dets[i].mask);
-		if (dets[i].prob)
-			free(dets[i].prob);
-	}
-	free(dets);
-
-	for (int i = 0; i < (int)layers_params.size(); i++)
-	{
-		layer l = layers_params[i];
-		if (l.output)
-			free(l.output);
-		if (l.biases)
-			free(l.biases);
-		if (l.mask)
-			free(l.mask);
-	}
-
-	cv::imshow(window_name, frame);
-	cv::waitKey(1); 
-//	frame.release();
+    if (prerun_graph(graph) < 0)
+    {
+        fprintf(stderr, "Prerun graph failed\n");
+        return -1;
+    }
+    return 0;
 }
 
 void postpress_graph_image_wrapper(void* data_pointer, int height, int width, float* array, graph_t graph, int output_node_num,int net_w, int net_h,int numBBoxes,int total_numAnchors,int layer_type)
 {
 	cv::Mat frame = cv::Mat(height, width, CV_8UC3, (uchar*)data_pointer);
-    const char *coco_names[80] = {"person","bicycle","car","motorbike","aeroplane","bus",
-                                "train","truck","boat","traffic light","fire hydrant","stop sign",
-                                "parking meter","bench","bird","cat","dog","horse","sheep","cow",
-                                "elephant","bear","zebra","giraffe","backpack","umbrella","handbag",
-                                "tie","suitcase","frisbee","skis","snowboard","sports ball","kite",
-                                "baseball bat","baseball glove","skateboard","surfboard","tennis racket",
-                                "bottle","wine glass","cup","fork","knife","spoon","bowl","banana","apple",
-                                "sandwich","orange","broccoli","carrot","hot dog","pizza","donut","cake",
-                                "chair","sofa","pottedplant","bed","diningtable","toilet","tvmonitor",
-                                "laptop","mouse","remote","keyboard","cell phone","microwave","oven",
-                                "toaster","sink","refrigerator","book","clock","vase","scissors","teddy bear","hair drier","toothbrush"};
+	const char *coco_names[80] = {"person","bicycle","car","motorbike","aeroplane","bus",
+								"train","truck","boat","traffic light","fire hydrant","stop sign",
+								"parking meter","bench","bird","cat","dog","horse","sheep","cow",
+								"elephant","bear","zebra","giraffe","backpack","umbrella","handbag",
+								"tie","suitcase","frisbee","skis","snowboard","sports ball","kite",
+								"baseball bat","baseball glove","skateboard","surfboard","tennis racket",
+								"bottle","wine glass","cup","fork","knife","spoon","bowl","banana","apple",
+								"sandwich","orange","broccoli","carrot","hot dog","pizza","donut","cake",
+								"chair","sofa","pottedplant","bed","diningtable","toilet","tvmonitor",
+								"laptop","mouse","remote","keyboard","cell phone","microwave","oven",
+								"toaster","sink","refrigerator","book","clock","vase","scissors","teddy bear","hair drier","toothbrush"};
 	std::vector<layer> layers_params;
 	layers_params.clear(); 
 
@@ -783,8 +525,8 @@ void postpress_graph_image_wrapper(void* data_pointer, int height, int width, fl
 		{
 			data_fp32[c] = (( float )data_uint8[c] - ( float )output_zero_point) * output_scale;
 		}
-        /* copy data to darknet layer */
-        memcpy(( void* )l_params.output, ( void* )data_fp32, sizeof(float) * l_params.inputs * l_params.batch);
+		/* copy data to darknet layer */
+		memcpy(( void* )l_params.output, ( void* )data_fp32, sizeof(float) * l_params.inputs * l_params.batch);
 
 		free(data_fp32);
 	}
@@ -813,8 +555,7 @@ void postpress_graph_image_wrapper(void* data_pointer, int height, int width, fl
 					cls = j;
 				}
 				fprintf(stderr, "%d: %.0f%%\n", cls, dets[i].prob[j] * 100);
-                array[counter*6 + 5] = (float) (dets[i].prob[j] * 100);
-//				sprintf(cvTest,"%s:%.0f%%",coco_names[cls],dets[i].prob[j]*100);
+				array[counter*6 + 5] = (float) (dets[i].prob[j] * 100); // write confidence to detection;
 				sprintf(cvTest,"%s",coco_names[cls]);
 			}
 
@@ -830,12 +571,12 @@ void postpress_graph_image_wrapper(void* data_pointer, int height, int width, fl
 			}
  
 			fprintf(stderr, "left = %d,top = %d, width = %.1f, height = %.1f\n", left, top, b.w, b.h);
-            array[counter*6] = (float) left;
-            array[counter*6 + 1] = (float) top;
-            array[counter*6 + 2] = (float) (b.w*frame.cols);
-            array[counter*6 + 3] = (float) (b.h*frame.rows);
-            array[counter*6 + 4] = (float) cls;
-            counter++;
+			array[counter*6] = (float) left;
+			array[counter*6 + 1] = (float) top;
+			array[counter*6 + 2] = (float) (b.w*frame.cols);
+			array[counter*6 + 3] = (float) (b.h*frame.rows);
+			array[counter*6 + 4] = (float) cls;
+			counter++;
 			cv::Rect rect(left, top, b.w*frame.cols, b.h*frame.rows);
 
 			int baseline;
@@ -846,13 +587,12 @@ void postpress_graph_image_wrapper(void* data_pointer, int height, int width, fl
 			cv::putText(frame,cvTest,cvPoint(left+5,top-5),cv::FONT_HERSHEY_COMPLEX,0.5,cv::Scalar(0,0,0),1);
 		}
 
-        
 		if (dets[i].mask)
 			free(dets[i].mask);
 		if (dets[i].prob)
 			free(dets[i].prob);
 	}
-    array[counter*6 + 5] = 0;
+	array[counter*6 + 5] = 0;
 	free(dets);
 
 	for (int i = 0; i < (int)layers_params.size(); i++)
@@ -860,325 +600,20 @@ void postpress_graph_image_wrapper(void* data_pointer, int height, int width, fl
 		layer l = layers_params[i];
 		if (l.output)
 			free(l.output);
-		if (l.biases)
-			free(l.biases);
+		if (l.anchors)
+			free(l.anchors);
 		if (l.mask)
 			free(l.mask);
 	}
-    // cv::imwrite("detection.jpg", frame);
-	// cv::namedWindow("MyWindow", 0x00000001); // CV_WINDOW_AUTOSIZE
-	// cv::imshow("MyWindow", frame);
-	// cv::waitKey(0);
 }
 
-void postpress_graph_image(const cv::Mat& sample, graph_t graph, int output_node_num,int net_w, int net_h,int numBBoxes,int total_numAnchors,int layer_type)
-{
-	cv::Mat frame = sample;
-    const char *coco_names[80] = {"person","bicycle","car","motorbike","aeroplane","bus",
-                                "train","truck","boat","traffic light","fire hydrant","stop sign",
-                                "parking meter","bench","bird","cat","dog","horse","sheep","cow",
-                                "elephant","bear","zebra","giraffe","backpack","umbrella","handbag",
-                                "tie","suitcase","frisbee","skis","snowboard","sports ball","kite",
-                                "baseball bat","baseball glove","skateboard","surfboard","tennis racket",
-                                "bottle","wine glass","cup","fork","knife","spoon","bowl","banana","apple",
-                                "sandwich","orange","broccoli","carrot","hot dog","pizza","donut","cake",
-                                "chair","sofa","pottedplant","bed","diningtable","toilet","tvmonitor",
-                                "laptop","mouse","remote","keyboard","cell phone","microwave","oven",
-                                "toaster","sink","refrigerator","book","clock","vase","scissors","teddy bear","hair drier","toothbrush"};
-	std::vector<layer> layers_params;
-	layers_params.clear();
-
-	for (int i = 0; i < output_node_num; ++i)
-	{
-		tensor_t out_tensor = get_graph_output_tensor(graph, i, 0);    //"detection_out"
-		int out_dim[4];
-		get_tensor_shape(out_tensor, out_dim, 4);
-		layer l_params;
-		int out_w = out_dim[3];
-		int out_h = out_dim[2];
-		l_params = make_darknet_layer(1, out_w, out_h, net_w, net_h, numBBoxes, total_numAnchors, classes, layer_type);
-		layers_params.push_back(l_params);
-
-		/* dequant output data */
-		float output_scale = 0.f;
-		int output_zero_point = 0;
-		get_tensor_quant_param(out_tensor, &output_scale, &output_zero_point, 1);
-		int count = get_tensor_buffer_size(out_tensor) / sizeof(uint8_t);
-		uint8_t* data_uint8 = ( uint8_t* )get_tensor_buffer(out_tensor);
-		float* data_fp32 = ( float* )malloc(sizeof(float) * count);
-		for (int c = 0; c < count; c++)
-		{
-			data_fp32[c] = (( float )data_uint8[c] - ( float )output_zero_point) * output_scale;
-		}
-        /* copy data to darknet layer */
-        memcpy(( void* )l_params.output, ( void* )data_fp32, sizeof(float) * l_params.inputs * l_params.batch);
-
-		free(data_fp32);
-	}
-
-	int nboxes = 0;
-	// get network boxes
-	detection* dets =
-		get_network_boxes(layers_params, frame.cols, frame.rows, net_w, net_h, thresh, hier_thresh, 0, relative, &nboxes);
-
-	if (nms != 0)
-	{
-		do_nms_sort(dets, nboxes, classes, nms);
-	}
-
-	int i, j;
-	for (i = 0; i < nboxes; ++i)
-	{
-		int cls = -1;
-		char cvTest[64];
-		for (j = 0; j < classes; ++j)
-		{
-			if (dets[i].prob[j] > thresh)
-			{
-				if (cls < 0)
-				{
-					cls = j;
-				}
-				fprintf(stderr, "%d: %.0f%%\n", cls, dets[i].prob[j] * 100);
-//				sprintf(cvTest,"%s:%.0f%%",coco_names[cls],dets[i].prob[j]*100);
-				sprintf(cvTest,"%s",coco_names[cls]);
-			}
-
-		}
-		if (cls >= 0)
-		{
-			box b = dets[i].bbox;
-			int left = (b.x - b.w / 2.)  * frame.cols;
-			int top = (b.y - b.h / 2.) * frame.rows;
-			if (top < 30) {
-				top = 30;
-				left +=10;
-			}
-
-			fprintf(stderr, "left = %d,top = %d, width = %.1f, height = %.1f\n", left, top, b.w, b.h);
-			cv::Rect rect(left, top, b.w*frame.cols, b.h*frame.rows);
-
-			int baseline;
-			cv::Size text_size = cv::getTextSize(cvTest, cv::FONT_HERSHEY_COMPLEX,0.5,1,&baseline);
-			cv::Rect rect1(left, top-20, text_size.width+10, 20);
-			cv::rectangle(frame,rect,obj_id_to_color(cls),2,20,0);
-			cv::rectangle(frame,rect1,obj_id_to_color(cls),-1);
-			cv::putText(frame,cvTest,cvPoint(left+5,top-5),cv::FONT_HERSHEY_COMPLEX,0.5,cv::Scalar(0,0,0),1);
-		}
-
-
-		if (dets[i].mask)
-			free(dets[i].mask);
-		if (dets[i].prob)
-			free(dets[i].prob);
-	}
-
-	free(dets);
-
-	for (int i = 0; i < (int)layers_params.size(); i++)
-	{
-		layer l = layers_params[i];
-		if (l.output)
-			free(l.output);
-		if (l.biases)
-			free(l.biases);
-		if (l.mask)
-			free(l.mask);
-	}
-    cv::imwrite("detection.jpg", frame);
-	// cv::namedWindow("MyWindow", 0x00000001); // CV_WINDOW_AUTOSIZE
-	// cv::imshow("MyWindow", frame);
-	// cv::waitKey(0);
-}
-
-void thread_camera()
-{
-    pthread_mutex_t mutex4q;
-	int layer_type = 0;
-	int numBBoxes = 3;
-	int total_numAnchors = 9;
-	int net_w = MODEL_COLS;
-	int net_h = MODEL_ROWS;
-
-    char* model_file = nullptr;
-	char *window_name = (char *)"CameraWindow";
-    char *video_device = NULL;
-    
-	string str = video_device;  
-	
-	cv::VideoCapture cap(str);
-	cap.set(cv::CAP_PROP_FRAME_WIDTH, CAMERA_WEIGHT);
-	cap.set(cv::CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT);
-	
-	if (!cap.isOpened()) {
-		cout << "Capture device failed to open!" << endl;
-		cap.release();
-	}
-
-	setpriority(PRIO_PROCESS, pthread_self(), -15);
-
-	cv::namedWindow(window_name);
-
- 
-	/* inital tengine */
-	init_tengine();
-	fprintf(stderr, "tengine-lite library version: %s\n", get_tengine_version());
-
-
-	/* set inference context with npu */
-	context_t timvx_context = create_context("timvx", 1);
-
-	int rtt = set_context_device(timvx_context, VXDEVICE, nullptr, 0);
-	if (0 > rtt)
-	{
-		fprintf(stderr, " add_context_device VSI DEVICE failed.\n");
-		exit(-1);
-	}
-
-	/* create graph, load tengine model xxx.tmfile */
-	graph_t graph = create_graph(timvx_context, "tengine", model_file);
-	if (graph == nullptr)
-	{
-		fprintf(stderr, "Create graph failed.\n");
-		fprintf(stderr, "errno: %d \n", get_tengine_errno());
-		exit(-1);
-	}
-
-
-	/* set the input shape to initial the graph, and prerun graph to infer shape */
-	int img_size = net_h * net_w * 3;
-	int dims[] = {1, 3, net_h, net_w};    // nchw
-
-	std::vector<uint8_t> input_data(img_size);
-
-	tensor_t input_tensor = get_graph_input_tensor(graph, 0, 0);
-	if (input_tensor == nullptr)
-	{
-		fprintf(stderr, "Get input tensor failed\n");
-		exit(-1);
-	}
-
-	if (set_tensor_shape(input_tensor, dims, 4) < 0)
-	{
-		fprintf(stderr, "Set input tensor shape failed\n");
-		exit(-1);
-	}
-
-	if (prerun_graph(graph) < 0)
-	{
-		fprintf(stderr, "Prerun graph failed\n");
-		exit(-1);
-	}
-
+int set_image_wrapper(void* data_pointer, int height, int width, tensor_t input_tensor, int net_h, int net_w){
 	float input_scale = 0.f;
 	int input_zero_point = 0;
-
-
-	get_tensor_quant_param(input_tensor, &input_scale, &input_zero_point, 1);
-
-	if (set_tensor_buffer(input_tensor, input_data.data(), img_size) < 0)
-	{
-		fprintf(stderr, "Set input tensor buffer failed\n");
-		exit(-1);
-	}
-
-	int output_node_num = get_graph_output_node_number(graph);
-    int counter = 1;
-    int frames = 30;
-    double start;
-    int repeat_count = DEFAULT_REPEAT_COUNT;
-
-	while(1){
-
-        if (counter==1){
-            start = get_current_time();
-        }
-
-		cv::Mat frame(CAMERA_HEIGHT,CAMERA_WEIGHT,CV_8UC3);
-		pthread_mutex_lock(&mutex4q);
-		if (!cap.read(frame)) {
-			pthread_mutex_unlock(&mutex4q);
-			cout<<"Capture read error"<<std::endl;
-			break;
-		}
-
-		pthread_mutex_unlock(&mutex4q);
-
-		get_input_data_cv(frame,input_data.data(),net_w,net_h,input_scale, input_zero_point,0);
-
-
-		/* run graph */	
-		for (int i = 0; i < repeat_count; i++)
-		{	
-			if (run_graph(graph, 1) < 0)
-			{
-				fprintf(stderr, "Run graph failed\n");
-				exit(-1);
-			}	
-		}
-
-		/* process the detection result */
-		int output_node_num = get_graph_output_node_number(graph);
-	
-		postpress_graph(frame,graph,output_node_num,net_w,net_h,numBBoxes,total_numAnchors,layer_type,window_name);
-
-		frame.release();
-
-        if (counter%frames==0) {
-            double end = get_current_time();
-            printf("FPS: %g\n", frames*1000/(end-start));
-            counter = 0;
-        } 
-
-        counter++;      
-	}
-	/* release tengine */
-	for (int i = 0; i < output_node_num; ++i)
-	{
-		tensor_t out_tensor = get_graph_output_tensor(graph, i, 0);
-		release_graph_tensor(out_tensor);
-	}
-
-
-	release_graph_tensor(input_tensor);
-	postrun_graph(graph);
-	destroy_graph(graph);
-	release_tengine();
-	// return 0;
-}
-int set_graph(int net_h, int net_w, graph_t graph){
-    int img_size = net_h * net_w * 3;
-    int dims[] = {1, 3, net_h, net_w};    // nchw
- 
-    vector<uint8_t> input_data(img_size);
-
-    tensor_t input_tensor = get_graph_input_tensor(graph, 0, 0);
-    if (input_tensor == nullptr)
-    {
-        fprintf(stderr, "Get input tensor failed\n");
-        return -1;
-    }
-
-    if (set_tensor_shape(input_tensor, dims, 4) < 0)
-    {
-        fprintf(stderr, "Set input tensor shape failed\n");
-        return -1;
-    }
-
-    if (prerun_graph(graph) < 0)
-    {
-        fprintf(stderr, "Prerun graph failed\n");
-        return -1;
-    }
-    return 0;
-}
-int set_image_wrapper(void* data_pointer, int height, int width, tensor_t input_tensor, int net_h, int net_w){
-    float input_scale = 0.f;
-    int input_zero_point = 0;
-    int img_size = net_h * net_w * 3;
-    vector<uint8_t> input_data(img_size);
+	int img_size = net_h * net_w * 3;
+	vector<uint8_t> input_data(img_size);
 	// cv::Mat frame = cv::imread(image_file,cv::IMREAD_COLOR);
-    cv::Mat frame = cv::Mat(height, width, CV_8UC3, (uchar*)data_pointer);
+	cv::Mat frame = cv::Mat(height, width, CV_8UC3, (uchar*)data_pointer);
 	if (frame.empty())
 	{
 		fprintf(stderr, "Empty buffer\n");
@@ -1193,166 +628,3 @@ int set_image_wrapper(void* data_pointer, int height, int width, tensor_t input_
 	get_input_data_cv(frame,input_data.data(),net_w,net_h,input_scale, input_zero_point, 0);
     return 0;
 }
-
-int set_image(const char* image_file, tensor_t input_tensor, int net_h, int net_w){
-    float input_scale = 0.f;
-    int input_zero_point = 0;
-    int img_size = net_h * net_w * 3;
-    vector<uint8_t> input_data(img_size);
-	cv::Mat frame = cv::imread(image_file,cv::IMREAD_COLOR);
-	if (frame.empty())
-	{
-		fprintf(stderr, "cv::imread %s failed\n", image_file);
-		return -1;
-	}
-
-    get_tensor_quant_param(input_tensor, &input_scale, &input_zero_point, 1);
-    if (set_tensor_buffer(input_tensor, input_data.data(), img_size) < 0)
-    {
-        fprintf(stderr, "Set input tensor buffer failed\n");
-        return -1;
-    }
-
-	get_input_data_cv(frame,input_data.data(),net_w,net_h,input_scale, input_zero_point, 0);
-    return 0;
-}
-
-int inference(const char* image_file, const char* model_file,
-            context_t timvx_context, int rtt){
-    int repeat_count = 1; 
-    int num_thread = 4;
-
-    int layer_type = 0;
-    int numBBoxes = 3;
-    int total_numAnchors = 9;
-    int net_w = 352;
-    int net_h = 352;
-    printf("Image: %s\n", image_file);
-
-    /* check files */
-    if (nullptr == model_file)
-    {
-        fprintf(stderr, "Error: Tengine model file not specified!\n");
-        show_usage();
-        return -1;
-    }
-
-    if (nullptr == image_file)
-    {
-        fprintf(stderr, "Error: Image file not specified!\n");
-        show_usage();
-        return -1;
-    }
-
-    if (!check_file_exist(model_file) || !check_file_exist(image_file))
-        return -1;
-
-    /* inital tengine */
-    // init_tengine();
-    fprintf(stderr, "tengine-lite library version: %s\n", get_tengine_version());
-
-	/* set inference context with npu */
-	// context_t timvx_context = create_context("timvx", 1);
-
-	// int rtt  = set_context_device(timvx_context, VXDEVICE, nullptr, 0);
-	if (0 > rtt)
-	{
-		fprintf(stderr, " add_context_device VSI DEVICE failed.\n");
-		exit(-1);
-	}
-
-    /* create graph, load tengine model xxx.tmfile */
-    graph_t graph = create_graph(timvx_context, "tengine", model_file);
-    if (graph == nullptr)
-    {
-        fprintf(stderr, "Create graph failed.\n");
-        fprintf(stderr, "errno: %d \n", get_tengine_errno());
-        return -1;
-    }
-
-    /* set the input shape to initial the graph, and prerun graph to infer shape */
-    int img_size = net_h * net_w * 3;
-    int dims[] = {1, 3, net_h, net_w};    // nchw
-
-    vector<uint8_t> input_data(img_size);
-
-    tensor_t input_tensor = get_graph_input_tensor(graph, 0, 0);
-    if (input_tensor == nullptr)
-    {
-        fprintf(stderr, "Get input tensor failed\n");
-        return -1;
-    }
-
-    if (set_tensor_shape(input_tensor, dims, 4) < 0)
-    {
-        fprintf(stderr, "Set input tensor shape failed\n");
-        return -1;
-    }
-
-    if (prerun_graph(graph) < 0)
-    {
-        fprintf(stderr, "Prerun graph failed\n");
-        return -1;
-    }
-
-    /* prepare process input data, set the data mem to input tensor */
-    float input_scale = 0.f;
-    int input_zero_point = 0;
-	cv::Mat frame = cv::imread(image_file,cv::IMREAD_COLOR);
-	if (frame.empty())
-	{
-		fprintf(stderr, "cv::imread %s failed\n", image_file);
-		return -1;
-	}
-
-    get_tensor_quant_param(input_tensor, &input_scale, &input_zero_point, 1); 
-    if (set_tensor_buffer(input_tensor, input_data.data(), img_size) < 0)
-    {
-        fprintf(stderr, "Set input tensor buffer failed\n");
-        return -1;
-    }
-
-	get_input_data_cv(frame,input_data.data(),net_w,net_h,input_scale, input_zero_point, 0);
-    /* run graph */
-    double min_time = __DBL_MAX__;
-    double max_time = -__DBL_MAX__;
-    double total_time = 0.;
-    for (int i = 0; i < repeat_count; i++)
-    {
-        double start = get_current_time();
-        if (run_graph(graph, 1) < 0)
-        {
-            fprintf(stderr, "Run graph failed\n");
-            return -1;
-        }
-        double end = get_current_time();
-        double cur = end - start;
-        total_time += cur;
-        min_time = min(min_time, cur);
-        max_time = max(max_time, cur);
-    }
-    fprintf(stderr, "Repeat %d times, thread %d, avg time %.2f ms, max_time %.2f ms, min_time %.2f ms\n", repeat_count,
-            num_thread, total_time / repeat_count, max_time, min_time);
-    fprintf(stderr, "--------------------------------------\n");
-
-    /* process the detection result */
-    int output_node_num = get_graph_output_node_number(graph);
-
-	postpress_graph_image(frame,graph,output_node_num,net_w,net_h,numBBoxes,total_numAnchors,layer_type);
-
-	/* release tengine */
-    for (int i = 0; i < output_node_num; ++i)
-    {
-        tensor_t out_tensor = get_graph_output_tensor(graph, i, 0);
-        release_graph_tensor(out_tensor);
-    } 
-
-
-    release_graph_tensor(input_tensor);
-    postrun_graph(graph);
-    destroy_graph(graph);
-    // release_tengine();
-
-    return 0;
-}
-
