@@ -1011,7 +1011,7 @@ void thread_camera()
 	cap.set(cv::CAP_PROP_FRAME_HEIGHT, CAMERA_HEIGHT);
 	
 	if (!cap.isOpened()) {
-		cout << "capture device failed to open!" << endl;
+		cout << "Capture device failed to open!" << endl;
 		cap.release();
 	}
 
