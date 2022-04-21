@@ -38,7 +38,8 @@ class YOLOV5(threading.Thread):
             libc.set_image_wrapper(self.frame.ctypes.data, height, width, self.input_tensor, 352, 352)
             libc.run_graph(self.graph, 1)
             self.frame = self.frame[::,::,::-1] #rgb to bgr
-            libc.postpress_graph_image_wrapper(self.frame.ctypes.data, height, width, self.dets.ctypes.data, self.graph,self.output_node_num, 352,352,self.draw)
+            libc.postpress_graph_image_wrapper(self.frame.ctypes.data, height, width, self.dets.ctypes.data, 
+					       self.graph,self.output_node_num, 352,352,self.draw)
             self.last_frame = copy.deepcopy(self.frame)
             self.last_dets = copy.deepcopy(self.dets)
             cv2.imshow('frame', self.last_frame)
