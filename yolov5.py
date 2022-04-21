@@ -7,7 +7,7 @@ import threading
 libc = cdll.LoadLibrary("./yolov5_lib.so")
 libc.set_image_wrapper.argtypes = [c_void_p, c_int, c_int, c_void_p, c_int, c_int]
 libc.postpress_graph_image_wrapper.argtypes = [c_void_p, c_int, c_int, c_void_p, c_void_p,
-                                                c_int , c_int, c_int, c_int, c_int, c_int]
+                                                c_int , c_int, c_int, c_int]
 class YOLOV5(threading.Thread):
     def __init__(self, model):
         threading.Thread.__init__(self)
@@ -26,28 +26,37 @@ class YOLOV5(threading.Thread):
         self.dets = np.zeros([30,6], dtype = np.float32)
         self.last_frame = None
         self.last_dets = None
+        self.draw = False
         print("Initialised")
     def inference(self):
-        while True:  
+        while True:
+            start_main = time.time()        
             ret, self.frame = self.cap.read()
+            print("reading from camera for: ", time.time() - start_main)
             height, width, _ = self.frame.shape
-            self.frame = self.frame[:,:,::-1]
+            self.frame = self.frame[:,:,::-1] #bgr to rgb
             libc.set_image_wrapper(self.frame.ctypes.data, height, width, self.input_tensor, 352, 352)
+            print("Set images for  ", time.time() - start_main)
+            start = time.time()
             libc.run_graph(self.graph, 1)
-            libc.postpress_graph_image_wrapper(self.frame.ctypes.data, height, width, self.dets.ctypes.data, self.graph,self.output_node_num, 352,352,3,9,0)
-            self.last_frame = copy.deepcopy(self.frame[::,::,::-1])
+            print("Graph ran for ", time.time() - start)
+            start = time.time()
+            self.frame = self.frame[::,::,::-1] #rgb to bgr
+            libc.postpress_graph_image_wrapper(self.frame.ctypes.data, height, width, self.dets.ctypes.data, self.graph,self.output_node_num, 352,352,self.draw)
+            print("Postprocess ran for ", time.time() - start)
+            self.last_frame = copy.deepcopy(self.frame)
             self.last_dets = copy.deepcopy(self.dets)
             cv2.imshow('frame', self.last_frame)
             key = cv2.waitKey(1)
             if (key == 27):
                 break
-                
+            print("Fps: ", 1/(time.time() - start_main))
+
     def run(self):
         self.inference()
-        
-if __name__ = "__main__":
-  yolov5 = YOLOV5("yolov5m_leaky_352_0mean_uint8.tmfile")
-  yolov5.start()
-  yolov5.setDaemon(True)
-  while True:
-      pass
+
+yolov5 = YOLOV5("yolov5m_leaky_352_0mean_uint8.tmfile")
+yolov5.start()
+yolov5.setDaemon(True)
+while True:
+    pass
