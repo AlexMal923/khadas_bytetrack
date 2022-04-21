@@ -28,6 +28,7 @@ class YOLOV5(threading.Thread):
         self.last_dets = None
         self.draw = False
         print("Initialised")
+        
     def inference(self):
         while True:
             start_main = time.time()        
@@ -54,9 +55,10 @@ class YOLOV5(threading.Thread):
 
     def run(self):
         self.inference()
-
-yolov5 = YOLOV5("yolov5m_leaky_352_0mean_uint8.tmfile")
-yolov5.start()
-yolov5.setDaemon(True)
-while True:
-    pass
+        
+if __name__ == "__main__":
+	yolov5 = YOLOV5("yolov5m_leaky_352_0mean_uint8.tmfile")
+	yolov5.start()
+	yolov5.setDaemon(True)
+	while True:
+		pass
