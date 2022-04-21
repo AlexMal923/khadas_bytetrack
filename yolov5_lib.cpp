@@ -27,8 +27,6 @@
 #define MODEL_COLS 352
 #define MODEL_ROWS 352
 
-#define DEBUG_OPTION 0
-
 #define CAMERA_WEIGHT 640
 #define CAMERA_HEIGHT 480
 
@@ -110,59 +108,56 @@ void get_input_data_cv(const cv::Mat& sample, uint8_t* input_data, int img_h, in
 }
 
 
-layer make_darknet_layer(int batch, int w, int h, int net_w, int net_h, int n, int total, int classes, int layer_type)
+layer make_darknet_layer(int batch, int w, int h, int net_w, int net_h, int n, int total, int classes)
 {
-    layer l = {0};
-    l.n = n;
-    l.total = total;
-    l.batch = batch;
-    l.h = h;
-    l.w = w;
-    l.c = n * (classes + 4 + 1);
-    l.out_w = l.w;
-    l.out_h = l.h;
-    l.out_c = l.c;
-    l.classes = classes;
-    l.inputs = l.w * l.h * l.c;
-    // yolov5
-    float anchors[18] = {10, 13, 16, 30, 33, 23, 30, 61, 62, 45, 59, 119, 116, 90, 156, 198, 373, 326};
+	layer l = {0};
+	l.n = n;
+	l.total = total;
+	l.batch = batch;
+	l.h = h;
+	l.w = w;
+	l.c = n * (classes + 4 + 1);
+	l.out_w = l.w;
+	l.out_h = l.h;
+	l.out_c = l.c;
+	l.classes = classes;
+	l.inputs = l.w * l.h * l.c;
+	// yolov5
+	float anchors[18] = {10, 13, 16, 30, 33, 23, 30, 61, 62, 45, 59, 119, 116, 90, 156, 198, 373, 326};
 
-    l.anchors = ( float* )calloc(total * 2, sizeof(float));
-    if (layer_type == 0)
-    {
-        l.mask = ( int* )calloc(n, sizeof(int));
-        if (9 == total)
-        {
-            for (int i = 0; i < total * 2; ++i)
-            {
-                l.anchors[i] = anchors[i];
-            }
-            if (l.w == net_w / 32)
-            {
-                int j = 6;
-                for (int i = 0; i < l.n; ++i)
-                    l.mask[i] = j++;
-            }
-            if (l.w == net_w / 16)
-            {
-                int j = 3;
-                for (int i = 0; i < l.n; ++i)
-                    l.mask[i] = j++;
-            }
-            if (l.w == net_w / 8)
-            {
-                int j = 0;
-                for (int i = 0; i < l.n; ++i)
-                    l.mask[i] = j++;
-            }
-        }
-    }
+	l.anchors = ( float* )calloc(total * 2, sizeof(float));
+		
+	l.mask = ( int* )calloc(n, sizeof(int));
+	if (9 == total)
+	{
+		for (int i = 0; i < total * 2; ++i)
+		{
+			l.anchors[i] = anchors[i];
+		}
+		if (l.w == net_w / 32)
+		{
+			int j = 6;
+			for (int i = 0; i < l.n; ++i)
+				l.mask[i] = j++;
+		}
+		if (l.w == net_w / 16)
+		{
+			int j = 3;
+			for (int i = 0; i < l.n; ++i)
+				l.mask[i] = j++;
+		}
+		if (l.w == net_w / 8)
+		{
+			int j = 0;
+			for (int i = 0; i < l.n; ++i)
+				l.mask[i] = j++;
+		}
+	}
 
-    l.layer_type = layer_type;
-    l.outputs = l.inputs;
-    l.output = ( float* )calloc(batch * l.outputs, sizeof(float));
+	l.outputs = l.inputs;
+	l.output = ( float* )calloc(batch * l.outputs, sizeof(float));
 
-    return l;
+	return l;
 }
 
 // void free_darknet_layer(layer l)
@@ -216,11 +211,9 @@ int num_detections(vector<layer> layers_params, float thresh)
     int s = 0;
     for (i = 0; i < ( int )layers_params.size(); ++i)
     {
-        layer l = layers_params[i];
-        if (0 == l.layer_type)
-            s += yolo_num_detections(l, thresh);
-        else if (1 == l.layer_type)
-            s += l.w * l.h * l.n;
+        layer l = layers_params[i];       
+        s += yolo_num_detections(l, thresh);
+
     }
 
     return s;
@@ -332,12 +325,10 @@ void fill_network_boxes(vector<layer> layers_params, int img_w, int img_h, int n
 	int j;
 	for (j = 0; j < ( int )layers_params.size(); ++j)
 	{
-		layer l = layers_params[j];
-		if (0 == l.layer_type)
-		{
-			int count = get_yolo_detections(l, img_w, img_h, net_w, net_h, thresh, map, relative, dets);
-			dets += count;
-		}
+		layer l = layers_params[j];	
+		int count = get_yolo_detections(l, img_w, img_h, net_w, net_h, thresh, map, relative, dets);
+		dets += count;
+		
 	}
 }
 
@@ -486,7 +477,7 @@ int set_graph(int net_h, int net_w, graph_t graph){
     return 0;
 }
 
-void postpress_graph_image_wrapper(void* data_pointer, int height, int width, float* array, graph_t graph, int output_node_num,int net_w, int net_h,int numBBoxes,int total_numAnchors,int layer_type)
+void postpress_graph_image_wrapper(void* data_pointer, int height, int width, float* array, graph_t graph, int output_node_num,int net_w, int net_h, int draw)
 {
 	cv::Mat frame = cv::Mat(height, width, CV_8UC3, (uchar*)data_pointer);
 	const char *coco_names[80] = {"person","bicycle","car","motorbike","aeroplane","bus",
@@ -501,6 +492,7 @@ void postpress_graph_image_wrapper(void* data_pointer, int height, int width, fl
 								"laptop","mouse","remote","keyboard","cell phone","microwave","oven",
 								"toaster","sink","refrigerator","book","clock","vase","scissors","teddy bear","hair drier","toothbrush"};
 	std::vector<layer> layers_params;
+	int numBBoxes = 3, total_numAnchors = 9;
 	layers_params.clear(); 
 
 	for (int i = 0; i < output_node_num; ++i)
@@ -511,7 +503,7 @@ void postpress_graph_image_wrapper(void* data_pointer, int height, int width, fl
 		layer l_params;
 		int out_w = out_dim[3];
 		int out_h = out_dim[2];
-		l_params = make_darknet_layer(1, out_w, out_h, net_w, net_h, numBBoxes, total_numAnchors, classes, layer_type);
+		l_params = make_darknet_layer(1, out_w, out_h, net_w, net_h, numBBoxes, total_numAnchors, classes);
 		layers_params.push_back(l_params);
 
 		/* dequant output data */
@@ -577,14 +569,16 @@ void postpress_graph_image_wrapper(void* data_pointer, int height, int width, fl
 			array[counter*6 + 3] = (float) (b.h*frame.rows);
 			array[counter*6 + 4] = (float) cls;
 			counter++;
-			cv::Rect rect(left, top, b.w*frame.cols, b.h*frame.rows);
+			if (draw){
+				cv::Rect rect(left, top, b.w*frame.cols, b.h*frame.rows);
 
-			int baseline;
-			cv::Size text_size = cv::getTextSize(cvTest, cv::FONT_HERSHEY_COMPLEX,0.5,1,&baseline);
-			cv::Rect rect1(left, top-20, text_size.width+10, 20);
-			cv::rectangle(frame,rect,obj_id_to_color(cls),2,20,0);
-			cv::rectangle(frame,rect1,obj_id_to_color(cls),-1);
-			cv::putText(frame,cvTest,cvPoint(left+5,top-5),cv::FONT_HERSHEY_COMPLEX,0.5,cv::Scalar(0,0,0),1);
+				int baseline;
+				cv::Size text_size = cv::getTextSize(cvTest, cv::FONT_HERSHEY_COMPLEX,0.5,1,&baseline);
+				cv::Rect rect1(left, top-20, text_size.width+10, 20);
+				cv::rectangle(frame,rect,obj_id_to_color(cls),2,20,0);
+				cv::rectangle(frame,rect1,obj_id_to_color(cls),-1);
+				cv::putText(frame,cvTest,cvPoint(left+5,top-5),cv::FONT_HERSHEY_COMPLEX,0.5,cv::Scalar(0,0,0),1);
+			}
 		}
 
 		if (dets[i].mask)
@@ -602,7 +596,7 @@ void postpress_graph_image_wrapper(void* data_pointer, int height, int width, fl
 		array[counter*6 + 5] = 0;
 		counter++;
 	}
-	array[counter*6 + 5] = 0;
+
 	free(dets);
 
 	for (int i = 0; i < (int)layers_params.size(); i++)
