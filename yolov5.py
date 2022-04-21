@@ -28,23 +28,13 @@ class YOLOV5(threading.Thread):
         self.last_dets = None
         print("Initialised")
     def inference(self):
-        while True:
-            start = time.time()        
-            # image = "dog.jpg"
-            # frame = cv2.imread(image)
+        while True:  
             ret, self.frame = self.cap.read()
-            print("reading from camera for: ", time.time() - start)
             height, width, _ = self.frame.shape
             self.frame = self.frame[:,:,::-1]
             libc.set_image_wrapper(self.frame.ctypes.data, height, width, self.input_tensor, 352, 352)
-            print("Set images for  ", time.time() - start)
-            start = time.time()
             libc.run_graph(self.graph, 1)
-            print("Graph ran for ", time.time() - start)
-            start = time.time()
-
             libc.postpress_graph_image_wrapper(self.frame.ctypes.data, height, width, self.dets.ctypes.data, self.graph,self.output_node_num, 352,352,3,9,0)
-            print("Postprocess ran for ", time.time() - start)
             self.last_frame = copy.deepcopy(self.frame[::,::,::-1])
             self.last_dets = copy.deepcopy(self.dets)
             cv2.imshow('frame', self.last_frame)
