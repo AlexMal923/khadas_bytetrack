@@ -9,7 +9,7 @@ import multiprocessing as mp
 from multiprocessing import shared_memory
 BUF_SZ = 10
 NUM_PROC = 2
-PROC = 0
+PROC = 1
 CLASSES = 1
 NUM_DETS = 300
 #MODEL = "yolov5m_bubbles.tmfile"

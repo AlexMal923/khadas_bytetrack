@@ -29,36 +29,36 @@ extern "C" {
 
 typedef struct
 {
-    float x, y, w, h;
+	float x, y, w, h;
 } box;
 
 typedef struct
 {
-    box bbox;
-    int classes;
-    float* prob;
-    float* mask;
-    float objectness;
-    int sort_class;
+	box bbox;
+	int classes;
+	float* prob;
+	float* mask;
+	float objectness;
+	int sort_class;
 } detection;
 
 typedef struct layer
 {
-    int batch;
-    int total;
-    int n, c, h, w;
-    int out_n, out_c, out_h, out_w;
-    int classes;
-    int inputs;
-    int outputs;
-    int* mask;
-    float* anchors;
-    float* output;
-    int coords;
+	int batch;
+	int total;
+	int n, c, h, w;
+	int out_n, out_c, out_h, out_w;
+	int classes;
+	int inputs;
+	int outputs;
+	int* mask;
+	float* anchors;
+	float* output;
+	int coords;
 } layer;
 
-void postpress_graph_image_wrapper(void* data_pointer, int height, int width, float* array,
-									 graph_t graph, int output_node_num,int net_w, int net_h, int draw);
+void postpress_graph_image_wrapper(int height, int width, float* array, graph_t graph,
+								   int output_node_num,int net_w, int net_h, int classes, int num_dets, float nms);
 									 
 int set_graph(int net_h, int net_w, graph_t graph);
 

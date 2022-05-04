@@ -35,10 +35,10 @@ static unsigned int tmpVal;
 #endif
 using namespace std;
 
-const int classes = 80;
-const float thresh = 0.5;
+// const int classes = 80;
+const float thresh = 0.3;
 const float hier_thresh = 0.5;
-const float nms = 0.45;
+// const float nms = 0.45;
 const int numBBoxes = 5;
 const int relative = 1;
 const int yolov3_numAnchors = 6;
@@ -62,7 +62,7 @@ void get_input_data_cv(const cv::Mat& sample, uint8_t* input_data, int img_h, in
 	else if (sample.channels() == 3 && swapRB == 1)
 	{
 		cv::cvtColor(sample, img, cv::COLOR_BGR2RGB);
-        cout << "BGR2RGB!" << endl;
+		cout << "BGR2RGB!" << endl;
 	}
 	else
 	{
@@ -107,6 +107,67 @@ void get_input_data_cv(const cv::Mat& sample, uint8_t* input_data, int img_h, in
 	}
 }
 
+void get_input_data_new(const cv::Mat& sample, uint8_t* input_data, int img_h, int img_w, float input_scale, int zero_point, int swapRB = 0)
+{
+	cv::Mat img;
+	if (sample.channels() == 4)
+	{
+		cv::cvtColor(sample, img, cv::COLOR_BGRA2BGR);
+	}
+	else if (sample.channels() == 1)
+	{
+		cv::cvtColor(sample, img, cv::COLOR_GRAY2BGR);
+	}
+	else if (sample.channels() == 3 && swapRB == 1)
+	{
+		cv::cvtColor(sample, img, cv::COLOR_BGR2RGB);
+		cout << "BGR2RGB!" << endl;
+	}
+	else
+	{
+		img = sample;
+	}
+	// cv::Mat img2(img_h,img_w,CV_8UC3,cv::Scalar(0,0,0));
+	// int h,w;
+	// if((float)img.cols/(float)img_w > (float)img.rows/(float)img_h){
+	// 	h=1.0*img_w/img.cols*img.rows;
+	// 	w=img_w;
+	// 	cv::resize(img, img, cv::Size(w,h));
+	// }else{
+	// 	w=1.0*img_h/img.rows*img.cols;
+	// 	h=img_h;
+	// 	cv::resize(img, img, cv::Size(w,h));
+	// }
+	// int top = (img_h - h)/2;
+	// int bat = (img_h - h + 1)/2;
+	// int left = (img_w - w)/2;
+	// int right = (img_w - w + 1)/2;
+
+
+	// cv::copyMakeBorder(img,img2,top,bat,left,right,cv::BORDER_CONSTANT,cv::Scalar(0,0,0));
+	uint8_t* img_data = img.data;
+	int hwc = img_h * img_w * 3;
+	for (int counter = 0; counter < hwc; counter++){
+		input_data[counter] = *img_data;
+		img_data++;
+	}
+	// for (int h = 0; h < img_h; h++)
+	// {
+	// 	for (int w = 0; w < img_w; w++)
+	// 	{
+	// 		for (int c = 0; c < 3; c++)
+	// 		{
+	// 			int udata = *img_data;
+	// 			if (udata > 255)
+	// 				udata = 255;
+	// 			else if (udata < 0)
+	// 				udata = 0;
+	// 			input_data[c * hw + h * img_w + w] = udata;
+	// 			img_data++;
+	// 		}
+	// 	}
+	// }
+}
 
 layer make_darknet_layer(int batch, int w, int h, int net_w, int net_h, int n, int total, int classes)
 {
@@ -181,141 +242,141 @@ layer make_darknet_layer(int batch, int w, int h, int net_w, int net_h, int n, i
 
 static int entry_index(layer l, int batch, int location, int entry)
 {
-    int n = location / (l.w * l.h);
-    int loc = location % (l.w * l.h);
-    return batch * l.outputs + n * l.w * l.h * (4 + l.classes + 1) + entry * l.w * l.h + loc;
+	int n = location / (l.w * l.h);
+	int loc = location % (l.w * l.h);
+	return batch * l.outputs + n * l.w * l.h * (4 + l.classes + 1) + entry * l.w * l.h + loc;
 }
 
 int yolo_num_detections(layer l, float thresh)
 {
-    int i, n, b;
-    int count = 0;
-    for (b = 0; b < l.batch; ++b)
-    {
-        for (i = 0; i < l.w * l.h; ++i)
-        {
-            for (n = 0; n < l.n; ++n)
-            {
-                int obj_index = entry_index(l, b, n * l.w * l.h + i, 4);
-                if (l.output[obj_index] > thresh)
-                    ++count;
-            }
-        }
-    }
-    return count;
+	int i, n, b;
+	int count = 0;
+	for (b = 0; b < l.batch; ++b)
+	{
+		for (i = 0; i < l.w * l.h; ++i)
+		{
+			for (n = 0; n < l.n; ++n)
+			{
+				int obj_index = entry_index(l, b, n * l.w * l.h + i, 4);
+				if (l.output[obj_index] > thresh)
+					++count;
+			}
+		}
+	}
+	return count;
 }
 
 int num_detections(vector<layer> layers_params, float thresh)
 {
-    int i;
-    int s = 0;
-    for (i = 0; i < ( int )layers_params.size(); ++i)
-    {
-        layer l = layers_params[i];       
-        s += yolo_num_detections(l, thresh);
+	int i;
+	int s = 0;
+	for (i = 0; i < ( int )layers_params.size(); ++i)
+	{
+		layer l = layers_params[i];       
+		s += yolo_num_detections(l, thresh);
 
-    }
+	}
 
-    return s;
+	return s;
 }
 
 detection* make_network_boxes(vector<layer> layers_params, float thresh, int* num)
 {
-    layer l = layers_params[0];
-    int i;
-    int nboxes = num_detections(layers_params, thresh);
-    if (num)
-        *num = nboxes;
-    detection* dets = ( detection* )calloc(nboxes, sizeof(detection));
+	layer l = layers_params[0];
+	int i;
+	int nboxes = num_detections(layers_params, thresh);
+	if (num)
+		*num = nboxes;
+	detection* dets = ( detection* )calloc(nboxes, sizeof(detection));
 
-    for (i = 0; i < nboxes; ++i)
-    {
-        dets[i].prob = ( float* )calloc(l.classes, sizeof(float));
-    }
-    return dets;
+	for (i = 0; i < nboxes; ++i)
+	{
+		dets[i].prob = ( float* )calloc(l.classes, sizeof(float));
+	}
+	return dets;
 }
 
 void correct_yolo_boxes(detection* dets, int n, int w, int h, int netw, int neth, int relative)
 {
-    int i;
-    int new_w = 0;
-    int new_h = 0;
-    if ((( float )netw / w) < (( float )neth / h))
-    {
-        new_w = netw;
-        new_h = (h * netw) / w;
-    }
-    else
-    {
-        new_h = neth;
-        new_w = (w * neth) / h;
-    }
-    for (i = 0; i < n; ++i)
-    {
-        box b = dets[i].bbox;
-        b.x = (b.x - (netw - new_w) / 2. / netw) / (( float )new_w / netw);
-        b.y = (b.y - (neth - new_h) / 2. / neth) / (( float )new_h / neth);
-        b.w *= ( float )netw / new_w;
-        b.h *= ( float )neth / new_h;
-        if (!relative)
-        {
-            b.x *= w;
-            b.w *= w;
-            b.y *= h;
-            b.h *= h;
-        }
-        dets[i].bbox = b;
-    }
+	int i;
+	int new_w = 0;
+	int new_h = 0;
+	if ((( float )netw / w) < (( float )neth / h))
+	{
+		new_w = netw;
+		new_h = (h * netw) / w;
+	}
+	else
+	{
+		new_h = neth;
+		new_w = (w * neth) / h;
+	}
+	for (i = 0; i < n; ++i)
+	{
+		box b = dets[i].bbox;
+		b.x = (b.x - (netw - new_w) / 2. / netw) / (( float )new_w / netw);
+		b.y = (b.y - (neth - new_h) / 2. / neth) / (( float )new_h / neth);
+		b.w *= ( float )netw / new_w;
+		b.h *= ( float )neth / new_h;
+		if (!relative)
+		{
+			b.x *= w;
+			b.w *= w;
+			b.y *= h;
+			b.h *= h;
+		}
+		dets[i].bbox = b;
+	}
 }
 
 box get_yolo_box(float* x, float* anchors, int n, int index, int i, int j, int lw, int lh, int w, int h, int stride)
 {
-    box b;
+	box b;
 
-    b.x = (i + (x[index + 0 * stride]) * 2 - 0.5) / lw;
-    b.y = (j + (x[index + 1 * stride]) * 2 - 0.5) / lh;
-    b.w = (4 * pow(x[index + 2 * stride], 2) * anchors[2 * n]) / w;
-    b.h = (4 * pow(x[index + 3 * stride], 2) * anchors[2 * n + 1]) / h;
+	b.x = (i + (x[index + 0 * stride]) * 2 - 0.5) / lw;
+	b.y = (j + (x[index + 1 * stride]) * 2 - 0.5) / lh;
+	b.w = (4 * pow(x[index + 2 * stride], 2) * anchors[2 * n]) / w;
+	b.h = (4 * pow(x[index + 3 * stride], 2) * anchors[2 * n + 1]) / h;
 
-    return b;
+	return b;
 }
 
 int get_yolo_detections(layer l, int w, int h, int netw, int neth, float thresh, int* map, int relative,
-                        detection* dets)
+						detection* dets)
 {
-    int i, j, n, b;
-    float* predictions = l.output;
-    int count = 0;
-    for (b = 0; b < l.batch; ++b)
-    {
-        for (i = 0; i < l.w * l.h; ++i)
-        {
-            int row = i / l.w;
-            int col = i % l.w;
-            for (n = 0; n < l.n; ++n)
-            {
-                int obj_index = entry_index(l, b, n * l.w * l.h + i, 4);
-                float objectness = predictions[obj_index];
-                if (objectness <= thresh)
-                    continue;
-                int box_index = entry_index(l, b, n * l.w * l.h + i, 0);
+	int i, j, n, b;
+	float* predictions = l.output;
+	int count = 0;
+	for (b = 0; b < l.batch; ++b)
+	{
+		for (i = 0; i < l.w * l.h; ++i)
+		{
+			int row = i / l.w;
+			int col = i % l.w;
+			for (n = 0; n < l.n; ++n)
+			{
+				int obj_index = entry_index(l, b, n * l.w * l.h + i, 4);
+				float objectness = predictions[obj_index];
+				if (objectness <= thresh)
+					continue;
+				int box_index = entry_index(l, b, n * l.w * l.h + i, 0);
 
-                dets[count].bbox = get_yolo_box(predictions, l.anchors, l.mask[n], box_index, col, row, l.w, l.h, netw,
-                                                neth, l.w * l.h);
-                dets[count].objectness = objectness;
-                dets[count].classes = l.classes;
-                for (j = 0; j < l.classes; ++j)
-                {
-                    int class_index = entry_index(l, b, n * l.w * l.h + i, 4 + 1 + j);
-                    float prob = objectness * predictions[class_index];
-                    dets[count].prob[j] = (prob > thresh) ? prob : 0;
-                }
-                ++count;
-            }
-        }
-    }
-    correct_yolo_boxes(dets, count, w, h, netw, neth, relative);
-    return count;
+				dets[count].bbox = get_yolo_box(predictions, l.anchors, l.mask[n], box_index, col, row, l.w, l.h, netw,
+												neth, l.w * l.h);
+				dets[count].objectness = objectness;
+				dets[count].classes = l.classes;
+				for (j = 0; j < l.classes; ++j)
+				{
+					int class_index = entry_index(l, b, n * l.w * l.h + i, 4 + 1 + j);
+					float prob = objectness * predictions[class_index];
+					dets[count].prob[j] = (prob > thresh) ? prob : 0;
+				}
+				++count;
+			}
+		}
+	}
+	correct_yolo_boxes(dets, count, w, h, netw, neth, relative);
+	return count;
 }
 
 
@@ -333,111 +394,111 @@ void fill_network_boxes(vector<layer> layers_params, int img_w, int img_h, int n
 }
 
 detection* get_network_boxes(vector<layer> layers_params, int img_w, int img_h, int net_w, int net_h, float thresh,
-                             float hier, int* map, int relative, int* num)
+							 float hier, int* map, int relative, int* num)
 {
-    // make network boxes
-    detection* dets = make_network_boxes(layers_params, thresh, num);
+	// make network boxes
+	detection* dets = make_network_boxes(layers_params, thresh, num);
 
-    // fill network boxes
-    fill_network_boxes(layers_params, img_w, img_h, net_w, net_h, thresh, hier, map, relative, dets);
-    return dets;
+	// fill network boxes
+	fill_network_boxes(layers_params, img_w, img_h, net_w, net_h, thresh, hier, map, relative, dets);
+	return dets;
 }
 
 // release detection memory
 void free_detections(detection* dets, int nboxes)
 {
-    int i;
-    for (i = 0; i < nboxes; ++i)
-    {
-        free(dets[i].prob);
-    }
-    free(dets);
+	int i;
+	for (i = 0; i < nboxes; ++i)
+	{
+		free(dets[i].prob);
+	}
+	free(dets);
 }
 
 float overlap(float x1, float w1, float x2, float w2)
 {
-    float l1 = x1 - w1 / 2;
-    float l2 = x2 - w2 / 2;
-    float left = l1 > l2 ? l1 : l2;
-    float r1 = x1 + w1 / 2;
-    float r2 = x2 + w2 / 2;
-    float right = r1 < r2 ? r1 : r2;
-    return right - left;
+	float l1 = x1 - w1 / 2;
+	float l2 = x2 - w2 / 2;
+	float left = l1 > l2 ? l1 : l2;
+	float r1 = x1 + w1 / 2;
+	float r2 = x2 + w2 / 2;
+	float right = r1 < r2 ? r1 : r2;
+	return right - left;
 }
 
 float box_intersection(box a, box b)
 {
-    float w = overlap(a.x, a.w, b.x, b.w);
-    float h = overlap(a.y, a.h, b.y, b.h);
-    if (w < 0 || h < 0)
-        return 0;
-    float area = w * h;
-    return area;
+	float w = overlap(a.x, a.w, b.x, b.w);
+	float h = overlap(a.y, a.h, b.y, b.h);
+	if (w < 0 || h < 0)
+		return 0;
+	float area = w * h;
+	return area;
 }
 
 float box_union(box a, box b)
 {
-    float i = box_intersection(a, b);
-    float u = a.w * a.h + b.w * b.h - i;
-    return u;
+	float i = box_intersection(a, b);
+	float u = a.w * a.h + b.w * b.h - i;
+	return u;
 }
 
 float box_iou(box a, box b)
 {
-    return box_intersection(a, b) / box_union(a, b);
+	return box_intersection(a, b) / box_union(a, b);
 }
 
-void do_nms_sort(detection* dets, int total, int classes, float thresh)
+void do_nms_sort(detection* dets, int total, int classes, float iou_thresh)
 {
-    int i, j, k;
-    k = total - 1;
-    for (i = 0; i <= k; ++i)
-    {
-        if (dets[i].objectness == 0)
-        {
-            detection swap = dets[i];
-            dets[i] = dets[k];
-            dets[k] = swap;
-            --k;
-            --i;
-        }
-    }
-    total = k + 1;
+	int i, j, k;
+	k = total - 1;
+	for (i = 0; i <= k; ++i)
+	{
+		if (dets[i].objectness == 0)
+		{
+			detection swap = dets[i];
+			dets[i] = dets[k];
+			dets[k] = swap;
+			--k;
+			--i;
+		}
+	}
+	total = k + 1;
 
-    for (k = 0; k < classes; ++k)
-    {
-        for (i = 0; i < total; ++i)
-        {
-            dets[i].sort_class = k;
-        }
-        // qsort(dets, total, sizeof(detection), nms_comparator);
-        for (i = 0; i < total; ++i)
-        {
-            if (dets[i].prob[k] == 0)
-                continue;
-            box a = dets[i].bbox;
-            for (j = i + 1; j < total; ++j)
-            {
-                box b = dets[j].bbox;
-                if (box_iou(a, b) > thresh)
-                {
-                    dets[j].prob[k] = 0;
+	for (k = 0; k < classes; ++k)
+	{
+		for (i = 0; i < total; ++i)
+		{
+			dets[i].sort_class = k;
+		}
+		// qsort(dets, total, sizeof(detection), nms_comparator);
+		for (i = 0; i < total; ++i)
+		{
+			if (dets[i].prob[k] == 0)
+				continue;
+			box a = dets[i].bbox;
+			for (j = i + 1; j < total; ++j)
+			{
+				box b = dets[j].bbox;
+				if (box_iou(a, b) > iou_thresh)
+				{
+					dets[j].prob[k] = 0;
 				}
-            }
-        }  
-    }
+			}
+		}  
+	}
 }
 
 int check_file_exist(const char* file_name)
 {
-    FILE* fp = fopen(file_name, "r");
-    if (!fp)
-    {
-        fprintf(stderr, "Input file not existed: %s\n", file_name);
-        return 0;
-    }
-    fclose(fp);
-    return 1;
+	FILE* fp = fopen(file_name, "r");
+	if (!fp)
+	{
+		fprintf(stderr, "Input file not existed: %s\n", file_name);
+		return 0;
+	}
+	fclose(fp);
+	return 1;
 }
 
 
@@ -467,30 +528,31 @@ int set_graph(int net_h, int net_w, graph_t graph){
 	{
 		fprintf(stderr, "Set input tensor shape failed\n");
 		return -1;
-    }
+	}
 
-    if (prerun_graph(graph) < 0)
-    {
-        fprintf(stderr, "Prerun graph failed\n");
-        return -1;
-    }
-    return 0;
+	if (prerun_graph(graph) < 0)
+	{
+		fprintf(stderr, "Prerun graph failed\n");
+		return -1;
+	}
+	return 0;
 }
 
-void postpress_graph_image_wrapper(void* data_pointer, int height, int width, float* array, graph_t graph, int output_node_num,int net_w, int net_h, int draw)
+void postpress_graph_image_wrapper(int height, int width, float* array, graph_t graph, int output_node_num,
+								   int net_w, int net_h, int classes, int num_dets, float nms)
 {
-	cv::Mat frame = cv::Mat(height, width, CV_8UC3, (uchar*)data_pointer);
-	const char *coco_names[80] = {"person","bicycle","car","motorbike","aeroplane","bus",
-								"train","truck","boat","traffic light","fire hydrant","stop sign",
-								"parking meter","bench","bird","cat","dog","horse","sheep","cow",
-								"elephant","bear","zebra","giraffe","backpack","umbrella","handbag",
-								"tie","suitcase","frisbee","skis","snowboard","sports ball","kite",
-								"baseball bat","baseball glove","skateboard","surfboard","tennis racket",
-								"bottle","wine glass","cup","fork","knife","spoon","bowl","banana","apple",
-								"sandwich","orange","broccoli","carrot","hot dog","pizza","donut","cake",
-								"chair","sofa","pottedplant","bed","diningtable","toilet","tvmonitor",
-								"laptop","mouse","remote","keyboard","cell phone","microwave","oven",
-								"toaster","sink","refrigerator","book","clock","vase","scissors","teddy bear","hair drier","toothbrush"};
+	// cv::Mat frame = cv::Mat(height, width, CV_8UC3, (uchar*)data_pointer);
+	// const char *coco_names[80] = {"person","bicycle","car","motorbike","aeroplane","bus",
+	// 							"train","truck","boat","traffic light","fire hydrant","stop sign",
+	// 							"parking meter","bench","bird","cat","dog","horse","sheep","cow",
+	// 							"elephant","bear","zebra","giraffe","backpack","umbrella","handbag",
+	// 							"tie","suitcase","frisbee","skis","snowboard","sports ball","kite",
+	// 							"baseball bat","baseball glove","skateboard","surfboard","tennis racket",
+	// 							"bottle","wine glass","cup","fork","knife","spoon","bowl","banana","apple",
+	// 							"sandwich","orange","broccoli","carrot","hot dog","pizza","donut","cake",
+	// 							"chair","sofa","pottedplant","bed","diningtable","toilet","tvmonitor",
+	// 							"laptop","mouse","remote","keyboard","cell phone","microwave","oven",
+	// 							"toaster","sink","refrigerator","book","clock","vase","scissors","teddy bear","hair drier","toothbrush"};
 	std::vector<layer> layers_params;
 	int numBBoxes = 3, total_numAnchors = 9;
 	layers_params.clear(); 
@@ -503,7 +565,7 @@ void postpress_graph_image_wrapper(void* data_pointer, int height, int width, fl
 		layer l_params;
 		int out_w = out_dim[3];
 		int out_h = out_dim[2];
-		l_params = make_darknet_layer(1, out_w, out_h, net_w, net_h, numBBoxes, total_numAnchors, classes);
+		l_params = make_darknet_layer(1, out_w, out_h, net_w, net_h, numBBoxes, total_numAnchors,  classes);
 		layers_params.push_back(l_params);
 
 		/* dequant output data */
@@ -526,18 +588,18 @@ void postpress_graph_image_wrapper(void* data_pointer, int height, int width, fl
 	int nboxes = 0;
 	// get network boxes
 	detection* dets =
-		get_network_boxes(layers_params, frame.cols, frame.rows, net_w, net_h, thresh, hier_thresh, 0, relative, &nboxes);
+		get_network_boxes(layers_params, width, height, net_w, net_h, thresh, hier_thresh, 0, relative, &nboxes);
 
 	if (nms != 0)
 	{
 		do_nms_sort(dets, nboxes, classes, nms);
 	}
-    int counter = 0;
+	int counter = 0;
 	int i, j;
 	for (i = 0; i < nboxes; ++i)
 	{
 		int cls = -1;
-		char cvTest[64];
+		// char cvTest[64];
 		for (j = 0; j < classes; ++j)
 		{
 			if (dets[i].prob[j] > thresh)
@@ -546,48 +608,51 @@ void postpress_graph_image_wrapper(void* data_pointer, int height, int width, fl
 				{
 					cls = j;
 				}
-				fprintf(stderr, "%d: %.0f%%\n", cls, dets[i].prob[j] * 100);
+				// fprintf(stderr, "%d: %.0f%%\n", cls, dets[i].prob[j] * 100);
 				array[counter*6 + 5] = (float) (dets[i].prob[j] * 100); // write confidence to detection;
-				sprintf(cvTest,"%s",coco_names[cls]);
+				// sprintf(cvTest,"%s",coco_names[cls]);
 			}
 
 		}
 		if (cls >= 0)
 		{
 			box b = dets[i].bbox;
-			int left = (b.x - b.w / 2.)  * frame.cols;
-			int top = (b.y - b.h / 2.) * frame.rows;
-			if (top < 30) {
-				top = 30;
-				left +=10;
-			}
+			int left = (b.x - b.w / 2.)  * width;
+			int top = (b.y - b.h / 2.) * height;
+			// if (top < 30) {
+			// 	top = 30;
+			// 	left +=10;
+			// }
  
-			fprintf(stderr, "left = %d,top = %d, width = %.1f, height = %.1f\n", left, top, b.w, b.h);
+			// fprintf(stderr, "left = %d,top = %d, width = %.1f, height = %.1f\n", left, top, b.w, b.h);
 			array[counter*6] = (float) left;
 			array[counter*6 + 1] = (float) top;
-			array[counter*6 + 2] = (float) (b.w*frame.cols);
-			array[counter*6 + 3] = (float) (b.h*frame.rows);
+			array[counter*6 + 2] = (float) (b.w*width);
+			array[counter*6 + 3] = (float) (b.h*height);
 			array[counter*6 + 4] = (float) cls;
 			counter++;
-			if (draw){
-				cv::Rect rect(left, top, b.w*frame.cols, b.h*frame.rows);
+			// if (draw){
+			// 	cv::Rect rect(left, top, b.w*frame.cols, b.h*frame.rows);
 
-				int baseline;
-				cv::Size text_size = cv::getTextSize(cvTest, cv::FONT_HERSHEY_COMPLEX,0.5,1,&baseline);
-				cv::Rect rect1(left, top-20, text_size.width+10, 20);
-				cv::rectangle(frame,rect,obj_id_to_color(cls),2,20,0);
-				cv::rectangle(frame,rect1,obj_id_to_color(cls),-1);
-				cv::putText(frame,cvTest,cvPoint(left+5,top-5),cv::FONT_HERSHEY_COMPLEX,0.5,cv::Scalar(0,0,0),1);
-			}
+			// 	int baseline;
+			// 	cv::Size text_size = cv::getTextSize(cvTest, cv::FONT_HERSHEY_COMPLEX,0.5,1,&baseline);
+			// 	cv::Rect rect1(left, top-20, text_size.width+10, 20);
+			// 	cv::rectangle(frame,rect,obj_id_to_color(cls),2,20,0);
+			// 	cv::rectangle(frame,rect1,obj_id_to_color(cls),-1);
+			// 	cv::putText(frame,cvTest,cvPoint(left+5,top-5),cv::FONT_HERSHEY_COMPLEX,0.5,cv::Scalar(0,0,0),1);
+			// }
 		}
 
 		if (dets[i].mask)
 			free(dets[i].mask);
 		if (dets[i].prob)
 			free(dets[i].prob);
+		if (counter == num_dets) {
+			break;
+		}
 	}
 	// set old detections to zero
-	while (counter < 30){
+	while (counter < num_dets){
 		array[counter*6 + 0] = 0;
 		array[counter*6 + 1] = 0;
 		array[counter*6 + 2] = 0;
@@ -628,6 +693,6 @@ int set_image_wrapper(void* data_pointer, int height, int width, tensor_t input_
 		fprintf(stderr, "Set input tensor buffer failed\n");
 		return -1;
 	}
-	get_input_data_cv(frame,input_data.data(),net_w,net_h,input_scale, input_zero_point, 0);
+	get_input_data_new(frame,input_data.data(),net_w,net_h,input_scale, input_zero_point, 0);
 	return 0;
 }
