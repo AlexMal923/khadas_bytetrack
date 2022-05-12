@@ -57,6 +57,8 @@ typedef struct layer
 	int coords;
 } layer;
 
+void run_graph_wrapper(int64_t p);
+
 void postpress_graph_image_wrapper(int height, int width, float* array, graph_t graph,
 								   int output_node_num,int net_w, int net_h, int classes, int num_dets, float nms);
 									 
