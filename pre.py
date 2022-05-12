@@ -7,11 +7,12 @@ from PIL import Image
 import multiprocessing as mp
 from multiprocessing import shared_memory
 
-SOURCE = "bubbles.mp4"
-#sSOURCE = "crowd.mp4"
+#SOURCE = "bubbles.mp4"
+#SOURCE = "crowd.mp4"
+SOURCE = 0
 BUF_SZ = 10
 FPS = 30
-VID = True
+VID = False
 NUM_PROC = 2
 NUM_DETS = 300
 def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=False, scaleFill=False, stride=32):
@@ -55,6 +56,12 @@ def cam():
 	shm_status = mp.shared_memory.SharedMemory(create=True, size=BUF_SZ, name = "status") 
 	shm_read = mp.shared_memory.SharedMemory(create=True, size=NUM_PROC*8, name = "read") 
 	shm_dets = mp.shared_memory.SharedMemory(create=True, size=BUF_SZ*4*NUM_DETS*6, name = "dets") 
+	shm_stop = mp.shared_memory.SharedMemory(create=True, size=1, name = "stop") 
+	stop =  np.ndarray([1], dtype=np.uint8, buffer=shm_stop.buf)
+	shm_change = mp.shared_memory.SharedMemory(create=True, size=1, name = "change") 
+	change =  np.ndarray([1], dtype=np.uint8, buffer=shm_change.buf)
+	stop[0] = 0
+	change[0] = 0
 	cap = cv2.VideoCapture(SOURCE)
 	cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
 	cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)	
@@ -64,22 +71,24 @@ def cam():
 	status = np.ndarray([10], dtype=np.uint8, buffer=shm_status.buf)
 	counter[0] = 0
 	try:
-		while True:		
-			start_main = time.time()	
-			ret, frame = cap.read()
-			if VID:
-				frame = cv2.resize(frame, [640,480], interpolation = cv2.INTER_LINEAR)
-				print("ONLYFORVIDEO")
-			start = time.time()
-			frm[counter[0]%BUF_SZ][:] = frame 
-			pre[counter[0]%BUF_SZ][:] = letterbox(frame, new_shape=(352, 352))
-			status[counter[0]%BUF_SZ] = 1
-			counter[0] += 1	
-			if VID:
-				slp = 1/FPS -(time.time() - start_main)
-				if slp > 0:
-					time.sleep(slp)
-			print("Fps: ", 1/(time.time() - start_main))
+		while True:	
+			while not stop:	
+				start_main = time.time()	
+				ret, frame = cap.read()
+				if VID:
+					frame = cv2.resize(frame, [640,480], interpolation = cv2.INTER_LINEAR)
+					print("ONLYFORVIDEO")
+				start = time.time()
+				frm[counter[0]%BUF_SZ][:] = frame 
+				pre[counter[0]%BUF_SZ][:] = letterbox(frame, new_shape=(352, 352))
+				status[counter[0]%BUF_SZ] = 1
+				counter[0] += 1	
+				if VID:
+					slp = 1/FPS -(time.time() - start_main)
+					if slp > 0:
+						time.sleep(slp)
+				print("Fps: ", 1/(time.time() - start_main))
+
 	finally:
 		print("\nDeleting object")
 		shm_counter.close()
