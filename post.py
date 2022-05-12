@@ -97,13 +97,4 @@ if __name__ == "__main__":
 	# try:
 	while True:
 		buf.show()
-	# except Exception as e:
-	# 	print(e)
-	# 	print("Closing links")
-	# 	buf.ex_frm.close()
-	# 	buf.ex_dets.close()
-	# 	buf.ex_read.close()
-	# 	buf.ex_frm.unlink()
-	# 	buf.ex_dets.unlink()
-	# 	buf.ex_read.unlink()
 	
