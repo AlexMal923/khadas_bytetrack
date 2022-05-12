@@ -18,7 +18,7 @@ names = ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', '
         'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear',
         'hair drier', 'toothbrush']
 
-class img_buffer():
+class Img_buffer():
 	def __init__(self):
 		self.ex_frm= shared_memory.SharedMemory(name="frame")
 		self.ex_read = shared_memory.SharedMemory(name="read")
@@ -72,6 +72,7 @@ class img_buffer():
 			print("Max FPS %.2f, Current Fps: %.2f"%(self.max_fps, self.fps))
 
 	def post(self, frame, dets):
+		# print("First pred: ", dets[0])
 		for det in dets:
 			if det[5] == 0:
 				continue
@@ -92,7 +93,7 @@ class img_buffer():
 		return frame
 
 if __name__ == "__main__":
-	buf = img_buffer()
+	buf = Img_buffer()
 	# try:
 	while True:
 		buf.show()
