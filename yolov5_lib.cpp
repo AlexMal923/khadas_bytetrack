@@ -538,6 +538,13 @@ int set_graph(int net_h, int net_w, graph_t graph){
 	return 0;
 }
 
+void run_graph_wrapper(int64_t p){
+	std::cout << "Run graph wrapper!";
+	printf("graph: %d", p);
+	graph_t* graph = (graph_t*) p;
+	run_graph(*graph, 1);
+}
+
 void postpress_graph_image_wrapper(int height, int width, float* array, graph_t graph, int output_node_num,
 								   int net_w, int net_h, int classes, int num_dets, float nms)
 {
