@@ -125,15 +125,10 @@ if __name__ == "__main__":
 			stop[0] = 0
 			change[0] = 1
 			
-			time.sleep(5)
-			# p3.kill()
 			p1.kill()
 			p2.kill()
 			change[0] = 0
 			
-			# p3 = mp.Process(target=cam, daemon = True)
-			# p3.start()
-			time.sleep(5)
 			p1 = mp.Process(target=run, args = (0, MODEL), daemon = True)
 			p1.start()
 			p2 = mp.Process(target=run, args = (1, MODEL), daemon = True)
