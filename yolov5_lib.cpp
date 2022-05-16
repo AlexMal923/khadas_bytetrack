@@ -537,6 +537,12 @@ int set_graph(int net_h, int net_w, graph_t graph){
 	return 0;
 }
 
+int get_classes(graph_t graph){
+	int dim[4];
+	get_tensor_shape(get_graph_output_tensor(graph, 0, 0), dim, 4);
+	int classes = dim[1]/3 - 5;
+	return classes;
+}
 void run_graph_wrapper(int64_t p){
 	std::cout << "Run graph wrapper!";
 	printf("graph: %d", p);

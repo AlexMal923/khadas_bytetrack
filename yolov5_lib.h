@@ -65,4 +65,6 @@ void postpress_graph_image_wrapper(int height, int width, float* array, graph_t 
 int set_graph(int net_h, int net_w, graph_t graph);
 
 int set_image_wrapper(void* data_pointer, int height, int width, tensor_t input_tensor, int net_h, int net_w);
+
+int get_classes(graph_t graph);
 }

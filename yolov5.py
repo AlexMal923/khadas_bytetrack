@@ -34,7 +34,8 @@ class YOLOV5():
 		self.input_tensor = libc.get_graph_input_tensor(self.graph, 0, 0)
 		self.output_node_num = libc.get_graph_output_node_number(self.graph)
 		self.dets = np.zeros([NUM_DETS,6], dtype = np.float32)  
-		self.classes = CLASSES
+		self.classes = libc.get_classes(self.graph)
+		print("Classes: ", self.classes)
 		self.last_dets = None
 		self.nms = 0.2
 		self.current = -1
