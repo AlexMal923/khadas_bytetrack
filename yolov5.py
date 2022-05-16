@@ -1,6 +1,5 @@
 from ctypes import *
 from multiprocessing import shared_memory
-import cv2
 import time 
 import copy
 import numpy as np
