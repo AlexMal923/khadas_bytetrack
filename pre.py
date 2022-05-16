@@ -15,6 +15,7 @@ FPS = 30
 VID = False
 NUM_PROC = 2
 NUM_DETS = 300
+
 def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=False, scaleFill=False, stride=32):
 	# Resize and pad image while meeting stride-multiple constraints
 	shape = im.shape[:2]  # current shape [height, width]
@@ -49,7 +50,7 @@ def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=False, scale
 	return im
 
 
-def cam():
+def cam(source):
 	shm_pre = mp.shared_memory.SharedMemory(create=True, size=BUF_SZ*3*352*352, name = "pre") 
 	shm_frm = mp.shared_memory.SharedMemory(create=True, size=BUF_SZ*3*480*640, name = "frame") 
 	shm_counter = mp.shared_memory.SharedMemory(create=True, size=8, name = "counter") 
@@ -58,11 +59,8 @@ def cam():
 	shm_dets = mp.shared_memory.SharedMemory(create=True, size=BUF_SZ*4*NUM_DETS*6, name = "dets") 
 	shm_stop = mp.shared_memory.SharedMemory(create=True, size=1, name = "stop") 
 	stop =  np.ndarray([1], dtype=np.uint8, buffer=shm_stop.buf)
-	shm_change = mp.shared_memory.SharedMemory(create=True, size=1, name = "change") 
-	change =  np.ndarray([1], dtype=np.uint8, buffer=shm_change.buf)
-	stop[0] = 0
-	change[0] = 0
-	cap = cv2.VideoCapture(SOURCE)
+	stop[0] = 1 
+	cap = cv2.VideoCapture(source)
 	cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
 	cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)	
 	pre = np.ndarray([BUF_SZ, 3, 352, 352], dtype=np.uint8, buffer=shm_pre.buf)
@@ -72,7 +70,7 @@ def cam():
 	counter[0] = 0
 	try:
 		while True:	
-			while not stop:	
+			if not stop:	
 				start_main = time.time()	
 				ret, frame = cap.read()
 				if VID:

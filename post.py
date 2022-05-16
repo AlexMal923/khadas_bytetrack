@@ -20,7 +20,7 @@ names = ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', '
 
 class Img_buffer():
 	def __init__(self):
-		self.ex_frm= shared_memory.SharedMemory(name="frame")
+		self.ex_frm = shared_memory.SharedMemory(name="frame")
 		self.ex_read = shared_memory.SharedMemory(name="read")
 		self.ex_dets = shared_memory.SharedMemory(name = "dets")
 		self.ex_status = shared_memory.SharedMemory(name="status") # not inferenced images = 1
@@ -52,9 +52,7 @@ class Img_buffer():
 					print("Reading from: ", self.temp)
 					self.frame_counter+=1
 					frame = self.frm[self.temp%BUF_SZ]
-					# print("frame shape: ",frame.shape)
 					dets = self.dets_buf[self.temp%BUF_SZ]
-					# print("dets: ", dets)
 					frame = self.post(frame, dets)
 					if not self.frame_counter % 30:
 						self.fps = 30/(time.time() - self.begin)
@@ -64,18 +62,17 @@ class Img_buffer():
 					cv2.imshow('frame', frame)
 					key = cv2.waitKey(1)
 				else: print("Not inferenced:", self.last+i)
+
 			if self.temp:
 				self.last = self.temp
-				self.temp = 0
-				
-
+				self.temp = 0		
 			print("Max FPS %.2f, Current Fps: %.2f"%(self.max_fps, self.fps))
 
 	def post(self, frame, dets):
 		# print("First pred: ", dets[0])
 		for det in dets:
 			if det[5] == 0:
-				continue
+				return frame
 			b = 100 + (25 * det[4]) % 156
 			g = 100 + (80 + 40 * det[4]) % 156
 			r = 100 + (120 + 60 * det[4]) % 156
@@ -97,4 +94,13 @@ if __name__ == "__main__":
 	# try:
 	while True:
 		buf.show()
+	# except Exception as e:
+	# 	print(e)
+	# 	print("Closing links")
+	# 	buf.ex_frm.close()
+	# 	buf.ex_dets.close()
+	# 	buf.ex_read.close()
+	# 	buf.ex_frm.unlink()
+	# 	buf.ex_dets.unlink()
+	# 	buf.ex_read.unlink()
 	
