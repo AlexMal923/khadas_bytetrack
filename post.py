@@ -1,9 +1,7 @@
 import cv2
 import numpy as np
-import multiprocessing
 from multiprocessing import shared_memory
 import time
-import copy
 
 BUF_SZ = 10
 NUM_PROC = 2
@@ -48,7 +46,6 @@ class Img_buffer():
                 return
             print("Difference:", diff)
             print(np.amin(self.read), self.last)
-            # if (np.amin(self.read) - self.last) >= NUM_PROC:
             for i in range(1,(diff+1)%BUF_SZ):
                 if not self.status[(self.last+i)%BUF_SZ]:# если инференс был на одной из картинок, которые не успели показать
                     self.temp = self.last+i
@@ -72,7 +69,6 @@ class Img_buffer():
             print("Max FPS %.2f, Current Fps: %.2f"%(self.max_fps, self.fps))
 
     def post(self, frame, dets):
-        # print("First pred: ", dets[0])
         for det in dets:
             if det[5] == 0:
                 return frame
@@ -81,7 +77,6 @@ class Img_buffer():
             r = 100 + (120 + 60 * det[4]) % 156
             color = (b, g, r)
             start = (int(det[0]), int(det[1])) 
-            # print((det[0], det[1]),(det[2], det[3]))
             end =(int(det[0]+det[2]), int(det[1] + det[3])) 
             cv2.rectangle(frame,start, end, color, 2)
             text = "%.0f "%(det[5]) + names[int(det[4])]
@@ -94,16 +89,6 @@ class Img_buffer():
 
 if __name__ == "__main__":
     buf = Img_buffer()
-    # try:
     while True:
         buf.show()
-    # except Exception as e:
-    # 	print(e)
-    # 	print("Closing links")
-    # 	buf.ex_frm.close()
-    # 	buf.ex_dets.close()
-    # 	buf.ex_read.close()
-    # 	buf.ex_frm.unlink()
-    # 	buf.ex_dets.unlink()
-    # 	buf.ex_read.unlink()
     

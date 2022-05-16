@@ -1,18 +1,12 @@
-from ctypes import *
-from pickletools import uint8
 import cv2
 import time 
 import numpy as np
-from PIL import Image
-import multiprocessing as mp
 from multiprocessing import shared_memory
 
-#SOURCE = "bubbles.mp4"
-#SOURCE = "crowd.mp4"
 SOURCE = 0
 BUF_SZ = 10
-FPS = 30
-VID = False
+FPS = 30 # set fps for video
+VID = False # change if you want to run video
 NUM_PROC = 2
 NUM_DETS = 300
 
@@ -51,13 +45,13 @@ def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=False, scale
 
 
 def cam(source):
-    shm_pre = mp.shared_memory.SharedMemory(create=True, size=BUF_SZ*3*352*352, name = "pre") 
-    shm_frm = mp.shared_memory.SharedMemory(create=True, size=BUF_SZ*3*480*640, name = "frame") 
-    shm_counter = mp.shared_memory.SharedMemory(create=True, size=8, name = "counter") 
-    shm_status = mp.shared_memory.SharedMemory(create=True, size=BUF_SZ, name = "status") 
-    shm_read = mp.shared_memory.SharedMemory(create=True, size=NUM_PROC*8, name = "read") 
-    shm_dets = mp.shared_memory.SharedMemory(create=True, size=BUF_SZ*4*NUM_DETS*6, name = "dets") 
-    shm_stop = mp.shared_memory.SharedMemory(create=True, size=1, name = "stop") 
+    shm_pre = shared_memory.SharedMemory(create=True, size=BUF_SZ*3*352*352, name = "pre") 
+    shm_frm = shared_memory.SharedMemory(create=True, size=BUF_SZ*3*480*640, name = "frame") 
+    shm_counter = shared_memory.SharedMemory(create=True, size=8, name = "counter") 
+    shm_status = shared_memory.SharedMemory(create=True, size=BUF_SZ, name = "status") 
+    shm_read = shared_memory.SharedMemory(create=True, size=NUM_PROC*8, name = "read") 
+    shm_dets = shared_memory.SharedMemory(create=True, size=BUF_SZ*4*NUM_DETS*6, name = "dets") 
+    shm_stop = shared_memory.SharedMemory(create=True, size=1, name = "stop") 
     stop =  np.ndarray([1], dtype=np.uint8, buffer=shm_stop.buf)
     stop[0] = 1 
     cap = cv2.VideoCapture(source)
