@@ -36,9 +36,8 @@ static unsigned int tmpVal;
 using namespace std;
 
 // const int classes = 80;
-const float thresh = 0.3;
+const float thresh = 0.2;
 const float hier_thresh = 0.5;
-// const float nms = 0.45;
 const int numBBoxes = 5;
 const int relative = 1;
 const int yolov3_numAnchors = 6;
