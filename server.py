@@ -1,8 +1,9 @@
 import cv2
 import numpy as np
-from multiprocessing import shared_memory
+from multiprocessing import shared_memory,Process
 import time
-
+from yolov5 import run
+from pre import cam
 BUF_SZ = 10
 NUM_PROC = 2
 NUM_DETS = 300
@@ -18,7 +19,8 @@ names = ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', '
         'hair drier', 'toothbrush']
 
 class Img_buffer():
-    def __init__(self):      
+    def __init__(self):
+		
         self.ex_frm = shared_memory.SharedMemory(name="frame")
         self.ex_read = shared_memory.SharedMemory(name="read")
         self.ex_dets = shared_memory.SharedMemory(name = "dets")
@@ -87,7 +89,13 @@ class Img_buffer():
                         color, 1)
         return frame
 
+    async def get_frame(self):
+        while self.frame is None:
+            pass
+        return self.frame
+    
 if __name__ == "__main__":
+
     buf = Img_buffer()
     while True:
         buf.show()
