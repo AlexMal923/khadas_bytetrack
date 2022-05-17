@@ -26,7 +26,7 @@ class Img_buffer():
         self.frm =  np.ndarray([BUF_SZ, 480, 640, 3], dtype=np.uint8, buffer=self.ex_frm.buf)
         self.read = np.ndarray([NUM_PROC], dtype=np.int64, buffer=self.ex_read.buf)		 
         self.dets_buf = np.ndarray([BUF_SZ, NUM_DETS, 6], dtype=np.float32, buffer=self.ex_dets.buf)
-        self.status = np.ndarray([10], dtype=np.uint8, buffer=self.ex_status.buf)
+        self.status = np.ndarray([BUF_SZ], dtype=np.uint8, buffer=self.ex_status.buf)
         self.counter = [-1]*NUM_PROC
         self.begin = time.time()
         self.frame_counter = 0
