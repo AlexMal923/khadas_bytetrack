@@ -1,11 +1,15 @@
 import cv2
 import numpy as np
-from multiprocessing import shared_memory
+from multiprocessing import shared_memory,Process
 import time
+from yolov5 import run
+from pre import cam
 
 BUF_SZ = 10
 NUM_PROC = 2
 NUM_DETS = 300
+SOURCE = 0
+MODEL = "yolov5m_leaky_352_0mean_uint8.tmfile"
 
 names = ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light',
         'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',
@@ -17,8 +21,15 @@ names = ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', '
         'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear',
         'hair drier', 'toothbrush']
 
-class Img_buffer():
-    def __init__(self):      
+class Khadas():
+    def __init__(self):
+        self.cam = Process(target=cam, args = (SOURCE,))
+        self.cam.start()
+        time.sleep(1)    
+        self.ex_stop = shared_memory.SharedMemory(name = "stop") 
+        self.stop =  np.ndarray([1], dtype=np.uint8, buffer=self.ex_stop.buf)  
+        self.last_model = MODEL
+        self.upload_models(MODEL)
         self.ex_frm = shared_memory.SharedMemory(name="frame")
         self.ex_read = shared_memory.SharedMemory(name="read")
         self.ex_dets = shared_memory.SharedMemory(name = "dets")
@@ -35,8 +46,35 @@ class Img_buffer():
         self.temp = 0
         self.fps = 0
         self.max_fps = 0
+        self.thresh = 20
         self.frame = None
         self.dets = None
+
+    def upload_models(self, model, change = False):
+        self.stop[0] = 1
+        if change:
+            self.m1.kill()
+            self.m2.kill()
+        self.m1 = Process(target=run, args = (0, model))
+        self.m1.start()
+        self.m2 = Process(target=run, args = (1, model))
+        self.m2.start()
+        if change:
+            time.sleep(5)  # wait so that model can start     
+            self.m1.join(timeout=0)
+            self.m2.join(timeout=0)
+            if not self.m1.is_alive() or not self.m2.is_alive():
+                self.stop[0] = 1
+                self.m1.kill()
+                self.m2.kill()
+                self.m1 = Process(target=run, args = (0, self.last_model))
+                self.m1.start()
+                self.m2 = Process(target=run, args = (1, self.last_model))
+                self.m2.start()
+                print("Corrupted model!")
+            else:
+                self.last_model = model  
+
 
     def show(self):
         if np.amin(self.read) - self.last:
@@ -72,6 +110,8 @@ class Img_buffer():
         for det in dets:
             if det[5] == 0:
                 return frame
+            if det[5] < self.thresh:
+                continue
             b = 100 + (25 * det[4]) % 156
             g = 100 + (80 + 40 * det[4]) % 156
             r = 100 + (120 + 60 * det[4]) % 156
@@ -87,8 +127,21 @@ class Img_buffer():
                         color, 1)
         return frame
 
+    async def get_frame(self):
+        while self.frame is None:
+            pass
+        return self.frame
+    
 if __name__ == "__main__":
-    buf = Img_buffer()
+
+    khadas = Khadas()
+
+    start = time.time()
     while True:
-        buf.show()
+        khadas.show()
+        if 35 > (time.time() - start) > 30:
+            print("Changing model")
+            khadas.upload_models("pre.py", change = True)
+        
+        
     

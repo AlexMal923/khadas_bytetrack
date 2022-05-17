@@ -60,7 +60,7 @@ def cam(source):
     pre = np.ndarray([BUF_SZ, 3, 352, 352], dtype=np.uint8, buffer=shm_pre.buf)
     frm = np.ndarray([BUF_SZ, 480, 640, 3], dtype=np.uint8, buffer=shm_frm.buf)
     counter = np.ndarray([1], dtype=np.int64, buffer=shm_counter.buf)
-    status = np.ndarray([10], dtype=np.uint8, buffer=shm_status.buf)
+    status = np.ndarray([BUF_SZ], dtype=np.uint8, buffer=shm_status.buf)
     counter[0] = 0
     try:
         while True:	

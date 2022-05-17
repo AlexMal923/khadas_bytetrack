@@ -7,6 +7,7 @@ import threading
 from multiprocessing import shared_memory, Process
 from post import Img_buffer
 from pre import *
+
 BUF_SZ = 10
 NUM_PROC = 2
 PROC = 0
@@ -48,7 +49,7 @@ class YOLOV5():
         self.pre = np.ndarray([BUF_SZ, 3, 352, 352], dtype=np.uint8, buffer=self.ex_pre.buf)
         self.counter = np.ndarray([1], dtype=np.int64, buffer=self.ex_counter.buf)
         self.frm =  np.ndarray([BUF_SZ, 480, 640, 3], dtype=np.uint8, buffer=self.ex_frm.buf)
-        self.status = np.ndarray([10], dtype=np.uint8, buffer=self.ex_status.buf)
+        self.status = np.ndarray([BUF_SZ], dtype=np.uint8, buffer=self.ex_status.buf)
         self.read = np.ndarray([NUM_PROC], dtype=np.int64, buffer=self.ex_read.buf)
         self.dets_buf = np.ndarray([BUF_SZ, NUM_DETS, 6], dtype=np.float32, buffer=self.ex_dets.buf)
         self.stop = np.ndarray([1], dtype=np.uint8, buffer=self.ex_stop.buf)
