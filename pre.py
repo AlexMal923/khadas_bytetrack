@@ -69,7 +69,7 @@ def cam(source):
                 ret, frame = cap.read()
                 if VID:
                     frame = cv2.resize(frame, [640,480], interpolation = cv2.INTER_LINEAR)
-                    print("ONLYFORVIDEO")
+                    # print("ONLYFORVIDEO")
                 start = time.time()
                 frm[counter[0]%BUF_SZ][:] = frame 
                 pre[counter[0]%BUF_SZ][:] = letterbox(frame, new_shape=(352, 352))
@@ -79,7 +79,7 @@ def cam(source):
                     slp = 1/FPS -(time.time() - start_main)
                     if slp > 0:
                         time.sleep(slp)
-                print("Fps: ", 1/(time.time() - start_main))
+                # print("Fps: ", 1/(time.time() - start_main))
 
     finally:
         print("\nDeleting object")

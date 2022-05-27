@@ -14,8 +14,10 @@ PROC = 0
 CLASSES = 80
 NUM_DETS = 300
 SOURCE = 0 
-MODEL = "yolov5m_leaky_352_0mean_uint8.tmfile"
-libc = cdll.LoadLibrary("./yolov5_lib.so")
+# MODEL = "yolov5m_leaky_352_0mean_uint8.tmfile"
+MODEL = "/home/khadas/workspace/khadas_python_yolov522/yolov5m_leaky_352_0mean_uint8.tmfile"
+# libc = cdll.LoadLibrary("./yolov5_lib.so")
+libc = cdll.LoadLibrary("/home/khadas/workspace/khadas_python_yolov522/yolov5_lib.so")
 libc.set_image_wrapper.argtypes = [c_void_p, c_int, c_int, c_void_p, c_int, c_int]
 libc.postpress_graph_image_wrapper.argtypes = [c_int, c_int, c_void_p, c_void_p,
                                                 c_int , c_int, c_int, c_int, c_int, c_float]
@@ -64,13 +66,13 @@ class YOLOV5():
             libc.set_image_wrapper(self.frame.ctypes.data, 352, 352, self.input_tensor, self.img_sz, self.img_sz )
             start = time.time()
             libc.run_graph(self.graph, 1)
-            print("Graph ran for ", time.time() - start)
+            # print("Graph ran for ", time.time() - start)
             start = time.time()
             libc.postpress_graph_image_wrapper(480, 640, self.dets.ctypes.data, 
                                                 self.graph,self.output_node_num, 352 ,self.img_sz, self.classes, NUM_DETS, self.nms)
             self.last_dets = copy.deepcopy(self.dets)
-            print("Frame number: ", self.current)
-            print("Full fps: ", 1/(time.time() - start_main))
+            # print("Frame number: ", self.current)
+            # print("Full fps: ", 1/(time.time() - start_main))
             self.read[self.proc] = self.current #last inferenced image from 0-9
             self.dets_buf[self.current%BUF_SZ][:] = self.dets[:]
 

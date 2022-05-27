@@ -46,9 +46,11 @@ class Khadas():
         self.temp = 0
         self.fps = 0
         self.max_fps = 0
-        self.thresh = 20
+        self.thresh = 10
         self.frame = None
         self.dets = None
+        self.tracker = None
+
 
     def upload_models(self, model, change = False):
         self.stop[0] = 1
@@ -125,7 +127,67 @@ class Khadas():
                         cv2.FONT_HERSHEY_COMPLEX,
                         0.5,
                         color, 1)
+            # cv2.imwrite(f'test_{time.time()}.jpg', frame)
         return frame
+    
+    def tracking_post(self, frame, dets):
+        for det in dets:
+            if not det.size:
+                continue
+            b = 100 + (25 * det[5]) % 156
+            g = 100 + (80 + 40 * det[5]) % 156
+            r = 100 + (120 + 60 * det[5]) % 156
+            color = (b, g, r)
+
+            start = (int(det[0]), int(det[1])) 
+            end =(int(det[2]), int(det[3])) 
+            cv2.rectangle(frame,start, end, color, 2)
+            text = str(int(det[5])) + f' {det[4]:#.0f} score'
+            cv2.putText(frame,text,
+                        (start[0]+5, start[1]-5),
+                        cv2.FONT_HERSHEY_COMPLEX,
+                        0.5,
+                        color, 1)
+            # cv2.imwrite(f'test_{time.time()}.jpg', frame)
+        return frame
+
+
+    def tracking(self):
+        if self.tracker is None:
+            raise "Set the tracker first"
+        if np.amin(self.read) - self.last:
+            diff = np.amin(self.read) - self.last
+            if diff > BUF_SZ:
+                self.last = np.amin(self.read)
+                return
+            for i in range(1,(diff+1)%BUF_SZ):
+                if not self.status[(self.last+i)%BUF_SZ]:# если инференс был на одной из картинок, которые не успели показать
+                    self.temp = self.last+i
+                    self.frame_counter+=1
+                    frame = self.frm[self.temp%BUF_SZ]
+                    self.dets = self.dets_buf[self.temp%BUF_SZ]
+                    self.dets = self.dets[(self.dets[:, 4] == 0) & (self.dets[:, 5] != 0)]  # person class & score != 0
+                    self.dets = np.delete(self.dets, 4, 1)  # drop class column 
+                    if len(self.dets):
+                        # self.dets = [x1,y1,w,h,score]
+                        self.dets = np.array([[i[0], i[1], i[0] + i[2], i[1] + i[3], i[4]] for i in self.dets])
+                    online_targets = self.tracker.update(self.dets, [frame.shape[0], frame.shape[1]], [frame.shape[0], frame.shape[1]])
+                    self.frame = self.tracking_post(frame, [np.append(i.tlbr, [i.score, i.track_id]) for i in online_targets])
+                    if not self.frame_counter % 30:
+                        self.fps = 30/(time.time() - self.begin)
+                        if self.fps > self.max_fps:
+                            self.max_fps = self.fps
+                        self.begin = time.time()
+                    cv2.imshow('frame', self.frame)
+                    key = cv2.waitKey(1)
+                    if key == ord('q'):
+                        break
+                if self.temp:
+                    self.last = self.temp
+                    self.temp = 0
+        else:
+            pass
+
 
     async def get_frame(self):
         while self.frame is None:
@@ -139,9 +201,9 @@ if __name__ == "__main__":
     start = time.time()
     while True:
         khadas.show()
-        if 35 > (time.time() - start) > 30:
-            print("Changing model")
-            khadas.upload_models("pre.py", change = True)
+        # if 35 > (time.time() - start) > 30:
+        #     print("Changing model")
+        #     khadas.upload_models("pre.py", change = True)
         
         
     

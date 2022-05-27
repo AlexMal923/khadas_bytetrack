@@ -36,7 +36,7 @@ static unsigned int tmpVal;
 using namespace std;
 
 // const int classes = 80;
-const float thresh = 0.2;
+const float thresh = 0.1;
 const float hier_thresh = 0.5;
 const int numBBoxes = 5;
 const int relative = 1;
